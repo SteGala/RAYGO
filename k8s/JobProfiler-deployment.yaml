@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-profiler-deployment
+  namespace: profiling
+  labels:
+    app: job-profiler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: job-profiler
+  template:
+    metadata:
+      labels:
+        app: job-profiler
+    spec:
+      containers:
+        - name: job-profiler
+          image: stegala/job-profiler
+          env:
+          - name: PROMETHEUS_URL
+            value: "10.110.228.103"
+          - name: PROMETHEUS_PORT
+            value: "9090"
+          - name: PROFILING_NAMESPACE
+            value: "" #empty means all the namespaces

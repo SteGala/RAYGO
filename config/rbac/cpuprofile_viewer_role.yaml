@@ -1,0 +1,20 @@
+# permissions for end users to view cpuprofiles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cpuprofile-viewer-role
+rules:
+- apiGroups:
+  - webapp.liqo.io.connectionprofile
+  resources:
+  - cpuprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - webapp.liqo.io.connectionprofile
+  resources:
+  - cpuprofiles/status
+  verbs:
+  - get

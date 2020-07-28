@@ -1,0 +1,24 @@
+# permissions for end users to edit memoryprofiles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: memoryprofile-editor-role
+rules:
+- apiGroups:
+  - webapp.liqo.io.connectionprofile
+  resources:
+  - memoryprofiles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - webapp.liqo.io.connectionprofile
+  resources:
+  - memoryprofiles/status
+  verbs:
+  - get

@@ -1,0 +1,24 @@
+# permissions for end users to edit cpuprofiles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cpuprofile-editor-role
+rules:
+- apiGroups:
+  - webapp.liqo.io.connectionprofile
+  resources:
+  - cpuprofiles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - webapp.liqo.io.connectionprofile
+  resources:
+  - cpuprofiles/status
+  verbs:
+  - get

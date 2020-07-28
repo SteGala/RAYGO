@@ -1,0 +1,13 @@
+domain: liqo.io.connectionprofile
+repo: github.io/SteGala/JobProfiler
+resources:
+- group: webapp
+  kind: ConnectionProfile
+  version: v1
+- group: webapp
+  kind: MemoryProfile
+  version: v1
+- group: webapp
+  kind: CPUProfile
+  version: v1
+version: "2"

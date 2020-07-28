@@ -1,0 +1,24 @@
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: watcher-role
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["watch", "list", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This cluster role binding allows anyone in the "manager" group to read secrets in any namespace.
+kind: ClusterRoleBinding
+metadata:
+  name: enable-watcher
+subjects:
+  - kind: User
+    name: system:serviceaccount:profiling:default # Name is case sensitive
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: watcher-role
+  apiGroup: rbac.authorization.k8s.io

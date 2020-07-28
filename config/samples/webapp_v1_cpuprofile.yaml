@@ -1,0 +1,7 @@
+apiVersion: webapp.liqo.io.connectionprofile/v1
+kind: CPUProfile
+metadata:
+  name: cpuprofile-sample
+spec:
+  # Add fields here
+  foo: bar

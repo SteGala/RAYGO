@@ -1,0 +1,7 @@
+apiVersion: webapp.liqo.io.connectionprofile/v1
+kind: MemoryProfile
+metadata:
+  name: memoryprofile-sample
+spec:
+  # Add fields here
+  foo: bar
