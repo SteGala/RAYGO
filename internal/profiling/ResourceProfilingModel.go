@@ -2,9 +2,9 @@ package profiling
 
 import (
 	"context"
-	v1 "github.io/SteGala/JobProfiler/api/v1"
-	"github.io/SteGala/JobProfiler/pkg/datastructure"
-	"github.io/SteGala/JobProfiler/pkg/system"
+	v1 "github.io/Liqo/JobProfiler/api/v1"
+	"github.io/Liqo/JobProfiler/internal/datastructure"
+	"github.io/Liqo/JobProfiler/internal/system"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
@@ -31,6 +31,14 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient
 	rp.crdClient = crdClient
 }
 
+// This function is called every time there is a new pod scheduling request. The behaviour of the
+// function is the following:
+//  - checks if there are information of the current job in the connection graph
+//  - the informations in the connection graph may be out of date, so it checks if they are still valid
+//    (the informations are considered out of date if they're older than one day)
+//  - if the informations are still valid the prediction is computed, instead if the informetions are not present
+//    or if they are out of date an update routine is triggered and the function returns. Next time the function
+//    will be called for the same pod the informations will be ready
 func (rp *ResourceProfiling) ComputePrediction(pod corev1.Pod, c chan string) {
 	dataAvailable := true
 	validTime := time.Now().AddDate(0, 0, -1)
@@ -45,16 +53,14 @@ func (rp *ResourceProfiling) ComputePrediction(pod corev1.Pod, c chan string) {
 			// if last update is before the last valid date the record in the datastructure needs to be updated
 
 			go updateResourceModel(rp, pod)
-			//log.Print("Information of pod " + pod.Name + " are out of date. Update routine triggered")
 			dataAvailable = false
 			c <- "empty"
 		}
 
 	} else {
 		// means that the job is not yet present in the datastructure so it needs to be added
-		//log.Print(err)
+
 		go updateResourceModel(rp, pod)
-		//log.Print("Information of pod " + pod.Name + " are not present in the model. Update routine triggered")
 		dataAvailable = false
 		c <- "empty"
 	}

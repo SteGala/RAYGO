@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	v1 "github.io/SteGala/JobProfiler/api/v1"
-	graph2 "github.io/SteGala/JobProfiler/pkg/datastructure"
-	"github.io/SteGala/JobProfiler/pkg/system"
+	v1 "github.io/Liqo/JobProfiler/api/v1"
+	graph2 "github.io/Liqo/JobProfiler/internal/datastructure"
+	"github.io/Liqo/JobProfiler/internal/system"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
@@ -27,6 +27,14 @@ func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClie
 	cp.graph = graph2.InitConnectionGraph()
 }
 
+// This function is called every time there is a new pod scheduling request. The behaviour of the
+// function is the following:
+//  - checks if there are information of the current job in the connection graph
+//  - the informations in the connection graph may be out of date, so it checks if they are still valid
+//    (the informations are considered out of date if they're older than one day)
+//  - if the informations are still valid the prediction is computed, instead if the informetions are not present
+//    or if they are out of date an update routine is triggered and the function returns. Next time the function
+//    will be called for the same pod the informations will be ready
 func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c chan string) {
 	namespace := pod.Namespace
 	dataAvailable := true
@@ -56,8 +64,9 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 
 	if dataAvailable {
 
-		var buffer bytes.Buffer
+		var buffer bytes.Buffer // stores the labels to add to the pod
 
+		// get the prediction for the given job
 		connJobs, err := cp.graph.GetJobConnections(extractDeploymentFromPodName(pod.Name), pod.Namespace)
 		if err != nil {
 			log.Print(err)
@@ -65,6 +74,7 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 			return
 		}
 
+		// create the CRDs
 		for id, slot := range connJobs {
 			var timeslot string
 
@@ -107,7 +117,6 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 				buffer.WriteString(crdName + "\n")
 
 			}
-
 		}
 
 		c <- buffer.String()
@@ -115,6 +124,24 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 
 	return
 }
+
+//func (cp *ConnectionProfiling) StartUpdateRoutine(nSec int) {
+//	for {
+//		cp.graph.
+//
+//		for _, job := range cg.jobs {
+//			job.
+//		}
+//
+//		cg.mutex.Unlock()
+//
+//		currTime := time.Now()
+//		t := currTime.Add(time.Second * time.Duration(nSec)).Unix()
+//
+//		time.Sleep(time.Duration(t - currTime.Unix()) * time.Second)
+//	}
+//}
+
 
 func updateConnectionGraph(cp *ConnectionProfiling, pod corev1.Pod) {
 	recordsRequest, err := cp.prometheus.GetConnectionRecords(extractDeploymentFromPodName(pod.Name), pod.Namespace, "request")

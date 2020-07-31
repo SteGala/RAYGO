@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.io/SteGala/JobProfiler/pkg/profiling"
+	"github.io/Liqo/JobProfiler/internal/profiling"
 	"log"
 	"os"
 )

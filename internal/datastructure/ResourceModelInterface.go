@@ -1,7 +1,7 @@
 package datastructure
 
 import (
-	"github.io/SteGala/JobProfiler/pkg/system"
+	"github.io/Liqo/JobProfiler/internal/system"
 	"time"
 )
 

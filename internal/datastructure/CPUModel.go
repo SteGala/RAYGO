@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/SteGala/JobProfiler/pkg/system"
+	"github.io/Liqo/JobProfiler/internal/system"
 	"math"
 	"sync"
 	"time"

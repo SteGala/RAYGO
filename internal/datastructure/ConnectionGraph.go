@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/SteGala/JobProfiler/pkg/system"
+	"github.io/Liqo/JobProfiler/internal/system"
 	"sync"
 
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//metav1 "k8s.io/apimachinery/internal/apis/meta/v1"
 	"strconv"
 	"time"
 )
@@ -154,27 +154,6 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 	cg.jobs[jobName+"{"+namespace+"}"] = job
 }
 
-func getDifferentJobNames(records []system.ConnectionRecord) []string {
-	differentJobs := make([]string, 0, 5)
-
-	// creates a list with all the different jobs connected to the current connectionJob
-	for _, record := range records {
-		found := false
-
-		for _, name := range differentJobs {
-			if name == record.To+"{"+record.DstNamespace+"}" {
-				found = true
-			}
-		}
-
-		if !found {
-			differentJobs = append(differentJobs, record.To+"{"+record.DstNamespace+"}")
-		}
-	}
-
-	return differentJobs
-}
-
 func (cg *ConnectionGraph) GetJobLastUpdate(jobName string, namespace string) (time.Time, error) {
 	cg.mutex.Lock()
 	defer cg.mutex.Unlock()
@@ -236,26 +215,6 @@ func (cg *ConnectionGraph) FindSCC(jobName string, namespace string) (string, er
 	return buffer.String(), nil
 }
 
-func DFS(cg *ConnectionGraph, connectedJob Connections, visited map[string]bool, buffer *bytes.Buffer, slot int) error {
-	visited[connectedJob.ConnectedTo] = true
-	buffer.WriteString(connectedJob.ConnectedTo)
-
-	if job, found := cg.jobs[connectedJob.ConnectedTo]; found {
-		for _, conn := range job.connectedJobs[slot] {
-			if visited[conn.ConnectedTo] == false {
-				buffer.WriteString(" ")
-				if err := DFS(cg, conn, visited, buffer, slot); err != nil {
-					return err
-				}
-			}
-		}
-	} else {
-		return errors.New("Job " + connectedJob.ConnectedTo + "not present")
-	}
-
-	return nil
-}
-
 func (cg *ConnectionGraph) PrintGraph() string {
 
 	var buffer bytes.Buffer
@@ -279,4 +238,45 @@ func (cg *ConnectionGraph) PrintGraph() string {
 	}
 
 	return buffer.String()
+}
+
+func DFS(cg *ConnectionGraph, connectedJob Connections, visited map[string]bool, buffer *bytes.Buffer, slot int) error {
+	visited[connectedJob.ConnectedTo] = true
+	buffer.WriteString(connectedJob.ConnectedTo)
+
+	if job, found := cg.jobs[connectedJob.ConnectedTo]; found {
+		for _, conn := range job.connectedJobs[slot] {
+			if visited[conn.ConnectedTo] == false {
+				buffer.WriteString(" ")
+				if err := DFS(cg, conn, visited, buffer, slot); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		return errors.New("Job " + connectedJob.ConnectedTo + "not present")
+	}
+
+	return nil
+}
+
+func getDifferentJobNames(records []system.ConnectionRecord) []string {
+	differentJobs := make([]string, 0, 5)
+
+	// creates a list with all the different jobs connected to the current connectionJob
+	for _, record := range records {
+		found := false
+
+		for _, name := range differentJobs {
+			if name == record.To+"{"+record.DstNamespace+"}" {
+				found = true
+			}
+		}
+
+		if !found {
+			differentJobs = append(differentJobs, record.To+"{"+record.DstNamespace+"}")
+		}
+	}
+
+	return differentJobs
 }

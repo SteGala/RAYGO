@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.io/SteGala/JobProfiler/pkg/profiling"
+	"github.io/SteGala/JobProfiler/internal/profiling"
 )
 
 func main() {

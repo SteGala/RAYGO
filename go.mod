@@ -1,4 +1,5 @@
-module github.io/SteGala/JobProfiler
+module github.io/Liqo/JobProfiler
+// module github.io/SteGala/JobProfiler
 
 go 1.13
 

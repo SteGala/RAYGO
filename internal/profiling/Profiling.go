@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	webappv1 "github.io/SteGala/JobProfiler/api/v1"
+	webappv1 "github.io/Liqo/JobProfiler/api/v1"
 	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -16,8 +16,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.io/SteGala/JobProfiler/controllers"
-	"github.io/SteGala/JobProfiler/pkg/system"
+	"github.io/Liqo/JobProfiler/controllers"
+	"github.io/Liqo/JobProfiler/internal/system"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -47,7 +47,7 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
-// initialize the profiling system
+// Initialize the profiling system. Returns error if something unexpected happens in the init process.
 func (p *ProfilingSystem) Init() error {
 	var err error
 
@@ -58,7 +58,7 @@ func (p *ProfilingSystem) Init() error {
 		return err
 	}
 
-	p.clientCRD, err = initKubernetesConnectionsCRDClient()
+	p.clientCRD, err = initKubernetesCRDClient()
 	if err != nil {
 		return err
 	}
@@ -83,6 +83,9 @@ func printInitialInformation() {
 	log.Println()
 }
 
+// This function:
+//  - checks if there is an available instance of Prometheus
+//  - checks if it's possible to create a Kubernetes client
 func runPreFlightCheck() (*system.PrometheusProvider, *kubernetesProvider, error) {
 
 	var prometheus system.PrometheusProvider
@@ -128,7 +131,7 @@ func initKubernetesClient() (*kubernetesProvider, error) {
 	return &provider, nil
 }
 
-func initKubernetesConnectionsCRDClient() (client.Client, error) {
+func initKubernetesCRDClient() (client.Client, error) {
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
@@ -176,7 +179,8 @@ func init() {
 //  - ConnectionProfilingModel
 //  - CPUProfilingModel
 //  - MemoryProfilingModel
-// to compute the profiling on each element
+// to compute the profiling on each element. Each profiling is executed in a different thread
+// and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfile(namespace string) error {
 
 	watch, err := p.client.client.CoreV1().Pods(namespace).Watch( /*context.TODO(), */ metav1.ListOptions{})
@@ -227,6 +231,13 @@ func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel 
 		pod.Annotations = make(map[string]string)
 	}
 
+	// ------------------------------------------------------------------------------
+	// IMPORTANT: if anything bad happens in the profiling of RAM, CPU or Connections
+	// no label are returned. In these situations are returned string containing
+	// "empty" as value. This is why there is always the check [label != "empty"]
+	// ((NEED TO IMPROVE!!))
+	// ------------------------------------------------------------------------------
+
 	// add labels for connections
 	if connectionLabels != "empty" {
 		addLabel = true
@@ -254,6 +265,7 @@ func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel 
 		pod.Annotations["liqo.io/cpuProfile"] = cpuLabel
 	}
 
+	// if there is at least one label to add, the request to the API server is created
 	if addLabel {
 		mJson, err := json.Marshal(pod)
 		if err != nil {
