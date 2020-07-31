@@ -30,7 +30,9 @@ type ConnectionProfileSpec struct {
 
 	// Foo is an example field of ConnectionProfile. Edit ConnectionProfile_types.go to remove/update
 	Source_job            string `json:"source_job"`
+	Source_namespace	  string `json:"source_namespace"`
 	Destination_job       string `json:"destination_job"`
+	Destination_namespace string `json:"destination_namespace"`
 	Bandwidth_requirement string `json:"bandwidth_requirement"`
 	UpdateTime            string `json:"update_time"`
 	TimeSlot              string `json:"timeslot"`

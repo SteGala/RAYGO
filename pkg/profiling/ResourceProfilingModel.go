@@ -3,8 +3,8 @@ package profiling
 import (
 	"context"
 	v1 "github.io/SteGala/JobProfiler/api/v1"
-	"github.io/SteGala/JobProfiler/src/datastructure"
-	"github.io/SteGala/JobProfiler/src/system"
+	"github.io/SteGala/JobProfiler/pkg/datastructure"
+	"github.io/SteGala/JobProfiler/pkg/system"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
@@ -31,13 +31,6 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient
 	rp.crdClient = crdClient
 }
 
-// l'idea sarebbe che questa funzione viene chiamata ogni volta che si presenta una rischiesta di
-// scheduling per un job. La funzione controlla nel modello se esiste gia una predizione per il job richiesto
-// e se tale predizione non e' troppo vecchia. In particolare:
-//  - se non esiste contatta il sistema di tracing e la crea
-//  - se esiste e non e' vecchia non la aggiorna
-//  - se esiste ma e' vecchia la tratta come se non esistesse e si comporta come nel primo caso
-// In ogni caso ritorna la lista dei Job connessi a quello richiesto
 func (rp *ResourceProfiling) ComputePrediction(pod corev1.Pod, c chan string) {
 	dataAvailable := true
 	validTime := time.Now().AddDate(0, 0, -1)
@@ -76,6 +69,7 @@ func (rp *ResourceProfiling) ComputePrediction(pod corev1.Pod, c chan string) {
 		}
 
 		memorySpec := make([]v1.MemorySpec, 0, 1)
+		cpuSpec := make([]v1.CPUSpec, 0, 1)
 
 		for id, slot := range strings.Split(prediction, "\n") {
 			var timeslot string
@@ -94,31 +88,67 @@ func (rp *ResourceProfiling) ComputePrediction(pod corev1.Pod, c chan string) {
 				timeslot = "18:00-24:00"
 			}
 
-			m := v1.MemorySpec{
-				Timezone: timeslot,
-				Value:    slot,
+			switch rp.data.(type) {
+			case *datastructure.MemoryModel:
+				m := v1.MemorySpec{
+					Timezone: timeslot,
+					Value:    slot,
+				}
+				memorySpec = append(memorySpec, m)
+
+			case *datastructure.CPUModel:
+				c := v1.CPUSpec{
+					Timezone: timeslot,
+					Value:    slot,
+				}
+				cpuSpec = append(cpuSpec, c)
+
+			default:
 			}
-			memorySpec = append(memorySpec, m)
 
 		}
 
 		time := time.Now().String()
-		crdName := "memprofile-" + generateResourceCRDName(pod.Name, pod.Namespace, time)
+		var crdName string
 
-		resInstance := v1.MemoryProfile{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      crdName,
-				Namespace: "profiling",
-			},
-			Spec: v1.MemoryProfileSpec{
-				UpdateTime:      time,
-				MemoryProfiling: memorySpec,
-			},
-		}
+		switch rp.data.(type) {
+		case *datastructure.MemoryModel:
+			crdName = "memprofile-" + generateResourceCRDName(pod.Name, pod.Namespace, time)
 
-		err = rp.crdClient.Create(context.TODO(), &resInstance)
-		if err != nil {
-			log.Print(err)
+			resInstance := v1.MemoryProfile{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      crdName,
+					Namespace: "profiling",
+				},
+				Spec: v1.MemoryProfileSpec{
+					UpdateTime:      time,
+					MemoryProfiling: memorySpec,
+				},
+			}
+
+			err = rp.crdClient.Create(context.TODO(), &resInstance)
+			if err != nil {
+				log.Print(err)
+			}
+		case *datastructure.CPUModel:
+			crdName = "cpuprofile-" + generateResourceCRDName(pod.Name, pod.Namespace, time)
+
+			resInstance := v1.CPUProfile{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      crdName,
+					Namespace: "profiling",
+				},
+				Spec: v1.CPUProfileSpec{
+					UpdateTime:      time,
+					MemoryProfiling: cpuSpec,
+				},
+			}
+
+			err = rp.crdClient.Create(context.TODO(), &resInstance)
+			if err != nil {
+				log.Print(err)
+			}
+		default:
 		}
 
 		c <- crdName

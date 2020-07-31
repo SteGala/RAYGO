@@ -17,7 +17,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.io/SteGala/JobProfiler/controllers"
-	"github.io/SteGala/JobProfiler/src/system"
+	"github.io/SteGala/JobProfiler/pkg/system"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -36,7 +36,7 @@ type kubernetesProvider struct {
 type ProfilingSystem struct {
 	connection ConnectionProfiling
 	memory     ResourceProfiling
-	// cpu ResourceProfiling
+	cpu        ResourceProfiling
 	prometheus *system.PrometheusProvider
 	client     *kubernetesProvider
 	clientCRD  client.Client
@@ -65,7 +65,7 @@ func (p *ProfilingSystem) Init() error {
 
 	p.connection.Init(p.prometheus, p.clientCRD)
 	p.memory.Init(p.prometheus, p.clientCRD, system.Memory)
-	// p.cpu.Init(p.prometheus, CPU)
+	p.cpu.Init(p.prometheus, p.clientCRD, system.CPU)
 
 	log.Println("Profiling setup completed")
 
@@ -186,7 +186,7 @@ func (p *ProfilingSystem) StartProfile(namespace string) error {
 
 	connChan := make(chan string)
 	memChan := make(chan string)
-	// 	cpuChan := make(chan string)
+	cpuChan := make(chan string)
 
 	for event := range watch.ResultChan() {
 
@@ -195,12 +195,13 @@ func (p *ProfilingSystem) StartProfile(namespace string) error {
 
 			go p.connection.ComputeConnectionsPrediction(*event.Object.(*v1.Pod), connChan)
 			go p.memory.ComputePrediction(*event.Object.(*v1.Pod), memChan)
-			// go p.cpu.ComputePrediction(*event.Object.(*v1.Pod), cpuChan)
+			go p.cpu.ComputePrediction(*event.Object.(*v1.Pod), cpuChan)
 
 			connLabels := <-connChan
 			memLabel := <-memChan
+			cpuLabel := <-cpuChan
 
-			if err := addPodLabels(p.client.client, connLabels, memLabel, event.Object.(*v1.Pod)); err != nil {
+			if err := addPodLabels(p.client.client, connLabels, memLabel, cpuLabel, event.Object.(*v1.Pod)); err != nil {
 				log.Print("Cannot add labels to pod " + event.Object.(*v1.Pod).Name)
 				log.Print(err)
 			}
@@ -213,7 +214,7 @@ func (p *ProfilingSystem) StartProfile(namespace string) error {
 	return nil
 }
 
-func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel string, pod *v1.Pod) error {
+func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel string, cpuLabel string, pod *v1.Pod) error {
 	addLabel := false
 
 	oJson, err := json.Marshal(pod)
@@ -244,6 +245,13 @@ func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel 
 		addLabel = true
 
 		pod.Annotations["liqo.io/memoryProfile"] = memoryLabel
+	}
+
+	// add label for cpu
+	if memoryLabel != "empty" {
+		addLabel = true
+
+		pod.Annotations["liqo.io/cpuProfile"] = cpuLabel
 	}
 
 	if addLabel {

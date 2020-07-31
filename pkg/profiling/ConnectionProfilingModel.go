@@ -5,12 +5,13 @@ import (
 	"context"
 	"fmt"
 	v1 "github.io/SteGala/JobProfiler/api/v1"
-	graph2 "github.io/SteGala/JobProfiler/src/datastructure"
-	"github.io/SteGala/JobProfiler/src/system"
+	graph2 "github.io/SteGala/JobProfiler/pkg/datastructure"
+	"github.io/SteGala/JobProfiler/pkg/system"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 	"time"
 )
 
@@ -26,13 +27,6 @@ func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClie
 	cp.graph = graph2.InitConnectionGraph()
 }
 
-// l'idea sarebbe che questa funzione viene chiamata ogni volta che si presenta una rischiesta di
-// scheduling per un job. La funzione controlla nel modello se esiste gia una predizione per il job richiesto
-// e se tale predizione non e' troppo vecchia. In particolare:
-//  - se non esiste contatta il sistema di tracing e la crea
-//  - se esiste e non e' vecchia non la aggiorna
-//  - se esiste ma e' vecchia la tratta come se non esistesse e si comporta come nel primo caso
-// In ogni caso ritorna la lista dei Job connessi a quello richiesto
 func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c chan string) {
 	namespace := pod.Namespace
 	dataAvailable := true
@@ -48,16 +42,14 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 			// if last update is before the last valid date the record in the datastructure needs to be updated
 
 			go updateConnectionGraph(cp, pod)
-			//log.Print("Information of pod " + pod.Name + " are out of date. Update routine triggered")
 			dataAvailable = false
 			c <- "empty"
 		}
 
 	} else {
 		// means that the job is not yet present in the datastructure so it needs to be added
-		//log.Print(err)
+
 		go updateConnectionGraph(cp, pod)
-		//log.Print("Information of pod " + pod.Name + " are not present in the model. Update routine triggered")
 		dataAvailable = false
 		c <- "empty"
 	}
@@ -98,7 +90,9 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 					},
 					Spec: v1.ConnectionProfileSpec{
 						Source_job:            extractDeploymentFromPodName(pod.Name),
-						Destination_job:       con.ConnectedTo,
+						Source_namespace: 	   pod.Namespace,
+						Destination_job:       strings.Split(con.ConnectedTo, "{")[0],
+						Destination_namespace: strings.Split(strings.Split(con.ConnectedTo, "{")[1], "}")[0], // !!modifica questa oscenita!!
 						Bandwidth_requirement: fmt.Sprintf("%.2f", con.Bandwidth),
 						UpdateTime:            time.Now().String(),
 						TimeSlot:              timeslot,
@@ -116,8 +110,6 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 
 		}
 
-		//log.Print(cp.graph.PrintGraph())
-		//log.Print("Profiling of job " + pod.Name + " completed")
 		c <- buffer.String()
 	}
 

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/SteGala/JobProfiler/src/system"
+	"github.io/SteGala/JobProfiler/pkg/system"
 	"sync"
 
 	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +44,8 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 	differentJobs := getDifferentJobNames(records)
 
 	cg.mutex.Lock()
+	defer cg.mutex.Unlock()
+
 
 	if _, found := cg.jobs[jobName+"{"+namespace+"}"]; !found {
 		job = &connectionJob{
@@ -150,7 +152,6 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 	}
 
 	cg.jobs[jobName+"{"+namespace+"}"] = job
-	cg.mutex.Unlock()
 }
 
 func getDifferentJobNames(records []system.ConnectionRecord) []string {
@@ -170,9 +171,6 @@ func getDifferentJobNames(records []system.ConnectionRecord) []string {
 			differentJobs = append(differentJobs, record.To+"{"+record.DstNamespace+"}")
 		}
 	}
-
-	//log.Print(len(differentJobs))
-	//log.Print(differentJobs)
 
 	return differentJobs
 }
@@ -205,8 +203,6 @@ func (cg *ConnectionGraph) FindSCC(jobName string, namespace string) (string, er
 
 	visited = make(map[string]bool, len(cg.jobs))
 
-	//buffer.WriteString("SSC of connectionJob: " + jobName + "\n")
-
 	if job, found := cg.jobs[jobName+"{"+namespace+"}"]; !found {
 		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
@@ -216,9 +212,6 @@ func (cg *ConnectionGraph) FindSCC(jobName string, namespace string) (string, er
 			for name, _ := range cg.jobs {
 				visited[name] = false
 			}
-
-			//buffer.WriteString("\tSlot: " + strconv.Itoa(i))
-			//buffer.WriteString("\t\t[ ")
 
 			visited[job.name] = true
 			buffer.WriteString(jobName + "{" + namespace + "}")

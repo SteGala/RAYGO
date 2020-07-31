@@ -230,13 +230,13 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 }
 
 func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string, recordType ResourceType) ([]ResourceRecord, error) {
-	var res prometheusQueryResultConnection
+	var res prometheusQueryResultResource
 	var records []ResourceRecord
 
 	end := time.Now().Unix()
 	start := time.Now().AddDate(0, 0, -7).Unix()
 
-	url := generateResourceURL(p.URLService, p.PortService, jobName, namespace, start, end)
+	url := generateResourceURL(p.URLService, p.PortService, jobName, namespace, start, end, recordType)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("Prometheus is not reachable at %s:%s", p.URLService, p.PortService))
@@ -291,17 +291,26 @@ func generateConnectionURL(ip string, port string, podName string, namespace str
 	// sum by(namespace, source_workload, destination_workload, dst_namespace) (increase(istio_request_bytes_sum{namespace="default", source_workload="productpage-v1"}[5m]))
 }
 
-func generateResourceURL(ip string, port string, podName string, namespace string, start int64, end int64) string {
-	return "http://" + ip + ":" + port +
-		"/api/v1/query_range?query=container_memory_usage_bytes%7Bnamespace%3D%22" + namespace +
-		"%22%2C%20container!%3D%22%22%2C%20" +
-		"id%3D~%22%2Fdocker.*%22%2C%20" +
-		"pod%3D~%22" + podName + ".*%22%7D" +
-		"&start=" + strconv.Itoa(int(start)) +
-		"&end=" + strconv.Itoa(int(end)) +
-		"&step=60"
+func generateResourceURL(ip string, port string, podName string, namespace string, start int64, end int64, recordType ResourceType) string {
 
-	// container_memory_usage_bytes{namespace="emojivoto", container!="", id=~"/docker.*"}
+	if recordType == Memory {
+		return "http://" + ip + ":" + port +
+			"/api/v1/query_range?query=container_memory_usage_bytes%7Bnamespace%3D%22" + namespace +
+			"%22%2C%20container!%3D%22%22%2C%20" +
+			"id%3D~%22%2Fdocker.*%22%2C%20" +
+			"pod%3D~%22" + podName + ".*%22%7D" +
+			"&start=" + strconv.Itoa(int(start)) +
+			"&end=" + strconv.Itoa(int(end)) +
+			"&step=60"
+	} else {
+		return "http://" + ip + ":" + port +
+			"/api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(rate%20" +
+			"(container_cpu_usage_seconds_total%7Bimage!%3D\"\"%2C%20pod%3D~\"" + podName + ".*\"%7D%5B1m%5D))" +
+			"&start=" + strconv.Itoa(int(start)) +
+			"&end=" + strconv.Itoa(int(end)) +
+			"&step=60"
+	}
+
 }
 
 // sum by (pod) (rate (container_cpu_usage_seconds_total{image!="", pod!=""}[1m]))

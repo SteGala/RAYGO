@@ -29,6 +29,26 @@ rules:
 - apiGroups:
   - webapp.liqo.io.connectionprofile
   resources:
+  - cpuprofiles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - webapp.liqo.io.connectionprofile
+  resources:
+  - cpuprofiles/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - webapp.liqo.io.connectionprofile
+  resources:
   - memoryprofiles
   verbs:
   - create

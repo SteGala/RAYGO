@@ -29,8 +29,8 @@ type CPUProfileSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of CPUProfile. Edit CPUProfile_types.go to remove/update
-	MemoryProfiling []CPUSpec 		`json:"cpuProfiling"`
-	UpdateTime      string       	`json:"updateTime"`
+	MemoryProfiling []CPUSpec `json:"cpuProfiling"`
+	UpdateTime      string    `json:"updateTime"`
 }
 
 type CPUSpec struct {
