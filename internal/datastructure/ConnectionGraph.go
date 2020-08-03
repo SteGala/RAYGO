@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
-	"sync"
-
-	//metav1 "k8s.io/apimachinery/internal/apis/meta/v1"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -46,7 +44,6 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 	cg.mutex.Lock()
 	defer cg.mutex.Unlock()
 
-
 	if _, found := cg.jobs[jobName+"{"+namespace+"}"]; !found {
 		job = &connectionJob{
 			name:          jobName + "{" + namespace + "}",
@@ -61,7 +58,6 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 		job = cg.jobs[jobName+"{"+namespace+"}"]
 	}
 
-	// per ognuno dei connectionJob che ho scoperto mi calcolo una media per fascia oraria
 	for _, name := range differentJobs {
 
 		numRecords := make([]int, timeSlots)

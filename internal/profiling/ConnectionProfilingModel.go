@@ -100,7 +100,7 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 					},
 					Spec: v1.ConnectionProfileSpec{
 						Source_job:            extractDeploymentFromPodName(pod.Name),
-						Source_namespace: 	   pod.Namespace,
+						Source_namespace:      pod.Namespace,
 						Destination_job:       strings.Split(con.ConnectedTo, "{")[0],
 						Destination_namespace: strings.Split(strings.Split(con.ConnectedTo, "{")[1], "}")[0], // !!modifica questa oscenita!!
 						Bandwidth_requirement: fmt.Sprintf("%.2f", con.Bandwidth),
@@ -141,7 +141,6 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 //		time.Sleep(time.Duration(t - currTime.Unix()) * time.Second)
 //	}
 //}
-
 
 func updateConnectionGraph(cp *ConnectionProfiling, pod corev1.Pod) {
 	recordsRequest, err := cp.prometheus.GetConnectionRecords(extractDeploymentFromPodName(pod.Name), pod.Namespace, "request")

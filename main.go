@@ -1,10 +1,9 @@
 package main
 
 import (
+	"github.io/Liqo/JobProfiler/internal/profiling"
 	"log"
 	"os"
-
-	"github.io/SteGala/JobProfiler/internal/profiling"
 )
 
 func main() {
@@ -13,7 +12,6 @@ func main() {
 
 	if err := profiling.Init(); err != nil {
 		log.Print(err)
-		return
 	}
 
 	if err := profiling.StartProfile(os.Getenv("PROFILING_NAMESPACE")); err != nil {

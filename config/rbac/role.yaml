@@ -7,7 +7,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - webapp.liqo.io.connectionprofile
+  - webapp.liqo.io.profiling
   resources:
   - connectionprofiles
   verbs:
@@ -19,7 +19,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - webapp.liqo.io.connectionprofile
+  - webapp.liqo.io.profiling
   resources:
   - connectionprofiles/status
   verbs:
@@ -27,7 +27,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - webapp.liqo.io.connectionprofile
+  - webapp.liqo.io.profiling
   resources:
   - cpuprofiles
   verbs:
@@ -39,7 +39,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - webapp.liqo.io.connectionprofile
+  - webapp.liqo.io.profiling
   resources:
   - cpuprofiles/status
   verbs:
@@ -47,7 +47,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - webapp.liqo.io.connectionprofile
+  - webapp.liqo.io.profiling
   resources:
   - memoryprofiles
   verbs:
@@ -59,7 +59,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - webapp.liqo.io.connectionprofile
+  - webapp.liqo.io.profiling
   resources:
   - memoryprofiles/status
   verbs:

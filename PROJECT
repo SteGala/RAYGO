@@ -1,5 +1,5 @@
-domain: liqo.io.connectionprofile
-repo: github.io/SteGala/JobProfiler
+domain: liqo.io.profiling
+repo: github.io/Liqo/JobProfiler
 resources:
 - group: webapp
   kind: ConnectionProfile

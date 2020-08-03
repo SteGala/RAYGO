@@ -147,7 +147,7 @@ func initKubernetesCRDClient() (client.Client, error) {
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "293de33f.liqo.io.connectionprofile",
+		LeaderElectionID:   "293de33f.liqo.io.profiling",
 	})
 
 	if err != nil {
@@ -156,10 +156,10 @@ func initKubernetesCRDClient() (client.Client, error) {
 
 	if err = (&controllers.ConnectionProfileReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ConnectionProfile"),
+		Log:    ctrl.Log.WithName("controllers").WithName("Profiling"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ConnectionProfile")
+		setupLog.Error(err, "unable to create controller", "controller", "Profiling")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

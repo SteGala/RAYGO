@@ -261,12 +261,12 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 		for _, m := range pd.Values {
 			var record ResourceRecord
 
-			val, err := strconv.Atoi(m.Value)
+			val, err := strconv.ParseFloat(m.Value, 64)
 			if err != nil {
 				return nil, err
 			}
 
-			record.Value = float64(val)
+			record.Value = val
 			record.Date = time.Unix(int64(m.TimeStamp), 0)
 
 			records = append(records, record)

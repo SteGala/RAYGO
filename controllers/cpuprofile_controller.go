@@ -24,7 +24,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	webappv1 "github.io/SteGala/JobProfiler/api/v1"
+	webappv1 "github.io/Liqo/JobProfiler/api/v1"
 )
 
 // CPUProfileReconciler reconciles a CPUProfile object
@@ -34,8 +34,8 @@ type CPUProfileReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=webapp.liqo.io.connectionprofile,resources=cpuprofiles,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=webapp.liqo.io.connectionprofile,resources=cpuprofiles/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=webapp.liqo.io.profiling,resources=cpuprofiles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=webapp.liqo.io.profiling,resources=cpuprofiles/status,verbs=get;update;patch
 
 func (r *CPUProfileReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()

@@ -48,7 +48,6 @@ func computeKPercentile(records []system.ResourceRecord, K int) []float64 {
 		sortedRecords[i] = make([]float64, 10)
 	}
 
-	//finalPrediction := make([][]float64, timeSlots)
 	for _, record := range records {
 
 		if record.Date.Hour() >= 0 && record.Date.Hour() < 6 {

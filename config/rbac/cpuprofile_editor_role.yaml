@@ -5,7 +5,7 @@ metadata:
   name: cpuprofile-editor-role
 rules:
 - apiGroups:
-  - webapp.liqo.io.connectionprofile
+  - webapp.liqo.io.profiling
   resources:
   - cpuprofiles
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - webapp.liqo.io.connectionprofile
+  - webapp.liqo.io.profiling
   resources:
   - cpuprofiles/status
   verbs:

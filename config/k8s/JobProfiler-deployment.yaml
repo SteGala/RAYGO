@@ -20,7 +20,7 @@ spec:
           image: stegala/job-profiler
           env:
           - name: PROMETHEUS_URL
-            value: "10.96.251.216"
+            value: "10.244.0.11"
           - name: PROMETHEUS_PORT
             value: "9090"
           - name: PROFILING_NAMESPACE

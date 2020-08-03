@@ -1,4 +1,4 @@
-apiVersion: webapp.liqo.io.connectionprofile/v1
+apiVersion: webapp.liqo.io.profiling/v1
 kind: ConnectionProfile
 metadata:
   name: connectionprofile-sample

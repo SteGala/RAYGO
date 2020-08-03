@@ -2,9 +2,9 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/webapp.liqo.io.connectionprofile_connectionprofiles.yaml
-- bases/webapp.liqo.io.connectionprofile_memoryprofiles.yaml
-- bases/webapp.liqo.io.connectionprofile_cpuprofiles.yaml
+- bases/webapp.liqo.io.profiling_connectionprofiles.yaml
+- bases/webapp.liqo.io.profiling_memoryprofiles.yaml
+- bases/webapp.liqo.io.profiling_cpuprofiles.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

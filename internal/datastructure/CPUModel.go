@@ -46,9 +46,6 @@ func (mm *CPUModel) InsertNewJob(jobName string, namespace string, records []sys
 
 	job.cpuPrediction = peak
 
-	//log.Print(peak)
-	//log.Print(percentile)
-
 	mm.jobs[jobName+"{"+namespace+"}"] = &job
 }
 

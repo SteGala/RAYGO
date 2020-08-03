@@ -6,18 +6,18 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
-  name: connectionprofiles.webapp.liqo.io.connectionprofile
+  name: cpuprofiles.webapp.liqo.io.profiling
 spec:
-  group: webapp.liqo.io.connectionprofile
+  group: webapp.liqo.io.profiling
   names:
-    kind: ConnectionProfile
-    listKind: ConnectionProfileList
-    plural: connectionprofiles
-    singular: connectionprofile
+    kind: CPUProfile
+    listKind: CPUProfileList
+    plural: cpuprofiles
+    singular: cpuprofile
   scope: Namespaced
   validation:
     openAPIV3Schema:
-      description: ConnectionProfile is the Schema for the connectionprofiles API
+      description: CPUProfile is the Schema for the cpuprofiles API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -32,35 +32,30 @@ spec:
         metadata:
           type: object
         spec:
-          description: ConnectionProfileSpec defines the desired state of ConnectionProfile
+          description: CPUProfileSpec defines the desired state of CPUProfile
           properties:
-            bandwidth_requirement:
-              type: string
-            destination_job:
-              type: string
-            destination_namespace:
-              type: string
-            source_job:
-              description: Foo is an example field of ConnectionProfile. Edit ConnectionProfile_types.go
+            cpuProfiling:
+              description: Foo is an example field of CPUProfile. Edit CPUProfile_types.go
                 to remove/update
-              type: string
-            source_namespace:
-              type: string
-            timeslot:
-              type: string
-            update_time:
+              items:
+                properties:
+                  timezone:
+                    type: string
+                  value:
+                    type: string
+                required:
+                - timezone
+                - value
+                type: object
+              type: array
+            updateTime:
               type: string
           required:
-          - bandwidth_requirement
-          - destination_job
-          - destination_namespace
-          - source_job
-          - source_namespace
-          - timeslot
-          - update_time
+          - cpuProfiling
+          - updateTime
           type: object
         status:
-          description: ConnectionProfileStatus defines the observed state of ConnectionProfile
+          description: CPUProfileStatus defines the observed state of CPUProfile
           type: object
       type: object
   version: v1

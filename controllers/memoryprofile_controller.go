@@ -24,7 +24,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	webappv1 "github.io/SteGala/JobProfiler/api/v1"
+	webappv1 "github.io/Liqo/JobProfiler/api/v1"
 )
 
 // MemoryProfileReconciler reconciles a MemoryProfile object
@@ -34,8 +34,8 @@ type MemoryProfileReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=webapp.liqo.io.connectionprofile,resources=memoryprofiles,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=webapp.liqo.io.connectionprofile,resources=memoryprofiles/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=webapp.liqo.io.profiling,resources=memoryprofiles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=webapp.liqo.io.profiling,resources=memoryprofiles/status,verbs=get;update;patch
 
 func (r *MemoryProfileReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()

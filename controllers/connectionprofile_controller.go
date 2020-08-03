@@ -24,7 +24,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	webappv1 "github.io/SteGala/JobProfiler/api/v1"
+	webappv1 "github.io/Liqo/JobProfiler/api/v1"
 )
 
 // ConnectionProfileReconciler reconciles a ConnectionProfile object
@@ -34,8 +34,8 @@ type ConnectionProfileReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=webapp.liqo.io.connectionprofile,resources=connectionprofiles,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=webapp.liqo.io.connectionprofile,resources=connectionprofiles/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=webapp.liqo.io.profiling,resources=connectionprofiles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=webapp.liqo.io.profiling,resources=connectionprofiles/status,verbs=get;update;patch
 
 func (r *ConnectionProfileReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()

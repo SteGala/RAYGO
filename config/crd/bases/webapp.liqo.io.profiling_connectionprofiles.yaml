@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
-  name: connectionprofiles.webapp.liqo.io.connectionprofile
+  name: connectionprofiles.webapp.liqo.io.profiling
 spec:
-  group: webapp.liqo.io.connectionprofile
+  group: webapp.liqo.io.profiling
   names:
     kind: ConnectionProfile
     listKind: ConnectionProfileList
