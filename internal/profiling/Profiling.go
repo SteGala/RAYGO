@@ -2,27 +2,23 @@ package profiling
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
-	webappv1 "github.io/Liqo/JobProfiler/api/v1"
-	"gomodules.xyz/jsonpatch/v2"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"os"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"strings"
-
 	"github.com/pkg/errors"
-	"github.io/Liqo/JobProfiler/controllers"
+	webappv1 "github.io/Liqo/JobProfiler/api/v1"
 	"github.io/Liqo/JobProfiler/internal/system"
+	"gomodules.xyz/jsonpatch/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"log"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"strings"
 	"time"
 	// +kubebuilder:scaffold:imports
 )
@@ -47,6 +43,13 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	_ = webappv1.AddToScheme(scheme)
+	// +kubebuilder:scaffold:scheme
+}
+
 // Initialize the profiling system. Returns error if something unexpected happens in the init process.
 func (p *ProfilingSystem) Init() error {
 	var err error
@@ -62,6 +65,7 @@ func (p *ProfilingSystem) Init() error {
 	if err != nil {
 		return err
 	}
+	log.Print("[CHECKED] Connection clientCRD created")
 
 	p.connection.Init(p.prometheus, p.clientCRD)
 	log.Print("[CHECKED] Connection graph initialized")
@@ -138,47 +142,10 @@ func initKubernetesClient() (*kubernetesProvider, error) {
 }
 
 func initKubernetesCRDClient() (client.Client, error) {
-	var metricsAddr string
-	var enableLeaderElection bool
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
-
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "293de33f.liqo.io.profiling",
+	return client.New(config.GetConfigOrDie(), client.Options{
+		Scheme: scheme,
 	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	if err = (&controllers.ConnectionProfileReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Profiling"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Profiling")
-		os.Exit(1)
-	}
-	// +kubebuilder:scaffold:builder
-
-	log.Print("[CHECKED] Connection clientCRD created")
-	return mgr.GetClient(), nil
-}
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-
-	_ = webappv1.AddToScheme(scheme)
-	// +kubebuilder:scaffold:scheme
 }
 
 // StartProfile starts the profiling system. It watches for pod creations and triggers:
@@ -239,7 +206,7 @@ func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel 
 
 	// ------------------------------------------------------------------------------
 	// IMPORTANT: if anything bad happens in the profiling of RAM, CPU or Connections
-	// no label are returned. In these situations are returned string containing
+	// no label are returned. In these situations are returned strings containing
 	// "empty" as value. This is why there is always the check [label != "empty"]
 	// ((NEED TO IMPROVE!!))
 	// ------------------------------------------------------------------------------
@@ -253,7 +220,7 @@ func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel 
 				continue
 			}
 
-			pod.Annotations["liqo.io/connectionProfile"+fmt.Sprintf("%d", id)] = strings.Split(label, " ")[1]
+			pod.Annotations["liqo.io/connectionProfile"+fmt.Sprintf("%d", id)] = label
 		}
 	}
 

@@ -46,8 +46,6 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 	cg.mutex.Lock()
 	defer cg.mutex.Unlock()
 
-	//log.Print(differentJobs)
-
 	if _, found := cg.jobs[jobName+"{"+namespace+"}"]; !found {
 		job = &connectionJob{
 			jobName:       jobName,
@@ -134,24 +132,36 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 				Bandwidth:   finalPrediction[i],
 			}
 
-			// append the prediction for the timeslot in the current job
-			job.connectedJobs[i] = append(job.connectedJobs[i], con)
+			// append the prediction for the timeslot in the current job (if not present)
+			// update the prediction (if present)
+			found := false
+			for id, j := range job.connectedJobs[i] {
+				if j.ConnectedTo == con.ConnectedTo {
+					found = true
+					job.connectedJobs[i][id] = con
+					break
+				}
+			}
+			if !found {
+				job.connectedJobs[i] = append(job.connectedJobs[i], con)
+			}
 
 			// append the same prediction to the other job (if not present)
-			found := false
-			for _, j := range cg.jobs[name].connectedJobs[i] {
+			// update the prediction (if present)
+			con2 := Connections{
+				ConnectedTo: jobName + "{" + namespace + "}",
+				Bandwidth:   finalPrediction[i],
+			}
+			found = false
+			for id, j := range cg.jobs[name].connectedJobs[i] {
 				if j.ConnectedTo == jobName+"{"+namespace+"}" {
 					found = true
+					cg.jobs[name].connectedJobs[i][id] = con2
 					break
 				}
 			}
 
 			if !found {
-				con2 := Connections{
-					ConnectedTo: jobName + "{" + namespace + "}",
-					Bandwidth:   finalPrediction[i],
-				}
-
 				cg.jobs[name].connectedJobs[i] = append(cg.jobs[name].connectedJobs[i], con2)
 			}
 		}

@@ -37,22 +37,17 @@ spec:
             memoryProfiling:
               description: Foo is an example field of MemoryProfile. Edit MemoryProfile_types.go
                 to remove/update
-              items:
-                properties:
-                  timezone:
-                    type: string
-                  value:
-                    type: string
-                required:
-                - timezone
-                - value
-                type: object
-              type: array
-            updateTime:
-              type: string
+              properties:
+                updateTime:
+                  type: string
+                value:
+                  type: string
+              required:
+              - updateTime
+              - value
+              type: object
           required:
           - memoryProfiling
-          - updateTime
           type: object
         status:
           description: MemoryProfileStatus defines the observed state of MemoryProfile

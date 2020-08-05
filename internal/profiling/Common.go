@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-func generateConnectionCRDName(sjob string, djob string, timeslot string, namespace string) string {
-	return hash(sjob + djob + timeslot + namespace)
+func generateConnectionCRDName(sjob string, djob string, namespace string) string {
+	return hash(sjob + djob + namespace)
 }
 
 func generateResourceCRDName(jobName string, namespace string) string {

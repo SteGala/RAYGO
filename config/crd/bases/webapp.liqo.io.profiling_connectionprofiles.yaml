@@ -46,8 +46,6 @@ spec:
               type: string
             source_namespace:
               type: string
-            timeslot:
-              type: string
             update_time:
               type: string
           required:
@@ -56,7 +54,6 @@ spec:
           - destination_namespace
           - source_job
           - source_namespace
-          - timeslot
           - update_time
           type: object
         status:

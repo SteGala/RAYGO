@@ -35,7 +35,6 @@ type ConnectionProfileSpec struct {
 	Destination_namespace string `json:"destination_namespace"`
 	Bandwidth_requirement string `json:"bandwidth_requirement"`
 	UpdateTime            string `json:"update_time"`
-	TimeSlot              string `json:"timeslot"`
 }
 
 // ConnectionProfileStatus defines the observed state of ConnectionProfile

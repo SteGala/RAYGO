@@ -29,13 +29,12 @@ type MemoryProfileSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of MemoryProfile. Edit MemoryProfile_types.go to remove/update
-	MemoryProfiling []MemorySpec `json:"memoryProfiling"`
-	UpdateTime      string       `json:"updateTime"`
+	MemoryProfiling MemorySpec `json:"memoryProfiling"`
 }
 
 type MemorySpec struct {
-	Timezone string `json:"timezone"`
-	Value    string `json:"value"`
+	UpdateTime string `json:"updateTime"`
+	Value      string `json:"value"`
 }
 
 // MemoryProfileStatus defines the observed state of MemoryProfile

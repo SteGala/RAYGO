@@ -6,12 +6,11 @@ import (
 	"github.io/Liqo/JobProfiler/internal/datastructure"
 	"github.io/Liqo/JobProfiler/internal/system"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"log"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -89,122 +88,82 @@ func (rp *ResourceProfiling) ComputePrediction(pod corev1.Pod, c chan string) {
 }
 
 func createResourceCRD(rp *ResourceProfiling, jobName string, jobNamespace string) string {
-	prediction, err := rp.data.GetPrediction(extractDeploymentFromPodName(jobName), jobNamespace)
+	currTime := time.Now()
+
+	prediction, err := rp.data.GetPrediction(extractDeploymentFromPodName(jobName), jobNamespace, currTime)
 	if err != nil {
 		log.Print(err)
 		return "empty"
 	}
 
-	memorySpec := make([]v1.MemorySpec, 0, 1)
-	cpuSpec := make([]v1.CPUSpec, 0, 1)
-
-	for id, slot := range strings.Split(prediction, "\n") {
-		var timeslot string
-
-		if slot == "" {
-			continue
-		}
-
-		if id == 0 {
-			timeslot = "00:00-06:00"
-		} else if id == 1 {
-			timeslot = "06:00-12:00"
-		} else if id == 2 {
-			timeslot = "12:00-18:00"
-		} else if id == 3 {
-			timeslot = "18:00-24:00"
-		}
-
-		switch rp.data.(type) {
-		case *datastructure.MemoryModel:
-			m := v1.MemorySpec{
-				Timezone: timeslot,
-				Value:    slot,
-			}
-			memorySpec = append(memorySpec, m)
-
-		case *datastructure.CPUModel:
-			c := v1.CPUSpec{
-				Timezone: timeslot,
-				Value:    slot,
-			}
-			cpuSpec = append(cpuSpec, c)
-
-		default:
-		}
-
-	}
-
-	time := time.Now().String()
 	var crdName string
+	var myCR runtime.Object
 
 	switch rp.data.(type) {
 	case *datastructure.MemoryModel:
+		memspec := v1.MemorySpec{
+			UpdateTime: currTime.String(),
+			Value:      prediction,
+		}
+
 		crdName = "memprofile-" + generateResourceCRDName(extractDeploymentFromPodName(jobName), jobNamespace)
-		//log.Print(jobName + " " + jobNamespace)
 
-		instance := &v1.MemoryProfile{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      crdName,
-				Namespace: "profiling",
-			},
-			Spec: v1.MemoryProfileSpec{
-				UpdateTime:      time,
-				MemoryProfiling: memorySpec,
-			},
-		}
+		myCR = &v1.MemoryProfile{}
 
-		err = rp.crdClient.Create(context.TODO(), instance)
-		if err != nil {
-			log.Print(err)
-			//myCR := &v1.MemoryProfile{}
-			//
-			//// c is a created client.Client
-			//err = rp.crdClient.Get(context.TODO(), client.ObjectKey{
-			//	Namespace: "profiling",
-			//	Name:      crdName}, myCR)
-			//
-			//if err != nil {
-			//	log.Print(err)
-			//} else {
-			//	log.Print(myCR)
-			//}
+		// the error is checked outside the switch
+		err = rp.crdClient.Get(context.TODO(), client.ObjectKey{
+			Namespace: "profiling",
+			Name:      crdName}, myCR)
 
-		}
+		myCR.(*v1.MemoryProfile).Name = crdName
+		myCR.(*v1.MemoryProfile).Namespace = "profiling"
+		myCR.(*v1.MemoryProfile).Spec.MemoryProfiling = memspec
 
-		return crdName
 	case *datastructure.CPUModel:
+		cpuspec := v1.CPUSpec{
+			UpdateTime: currTime.String(),
+			Value:      prediction,
+		}
+
 		crdName = "cpuprofile-" + generateResourceCRDName(extractDeploymentFromPodName(jobName), jobNamespace)
 
-		resInstance := v1.CPUProfile{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      crdName,
-				Namespace: "profiling",
-			},
-			Spec: v1.CPUProfileSpec{
-				UpdateTime:      time,
-				MemoryProfiling: cpuSpec,
-			},
-		}
+		myCR = &v1.CPUProfile{}
 
-		err = rp.crdClient.Create(context.TODO(), &resInstance)
+		// the error is checked outside the switch
+		err = rp.crdClient.Get(context.TODO(), client.ObjectKey{
+			Namespace: "profiling",
+			Name:      crdName}, myCR)
+
+		myCR.(*v1.CPUProfile).Name = crdName
+		myCR.(*v1.CPUProfile).Namespace = "profiling"
+		myCR.(*v1.CPUProfile).Spec.MemoryProfiling = cpuspec
+
+	default:
+		return "empty"
+	}
+
+	// The Get operation returns error if the resource is not present. If not present we create it,
+	// if present we update it
+	if err != nil {
+		err = rp.crdClient.Create(context.TODO(), myCR)
 		if err != nil {
 			log.Print(err)
 		}
-
-		return crdName
-	default:
+	} else {
+		err = rp.crdClient.Update(context.TODO(), myCR)
+		if err != nil {
+			log.Print(err)
+		}
 	}
 
-	return "empty"
+	return crdName
 }
 
 func startResourceUpdateRoutine(rp *ResourceProfiling) {
 	for {
 		if jobName, jobNamespace, err := rp.data.GetLastUpdatedJob(); err == nil {
 			updateResourceModel(rp, jobName, jobNamespace)
-
-			createResourceCRD(rp, jobName, jobNamespace)
+			log.Print("Updated " + createResourceCRD(rp, jobName, jobNamespace))
 		}
 
 		currTime := time.Now()

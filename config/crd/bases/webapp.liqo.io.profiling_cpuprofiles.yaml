@@ -37,22 +37,17 @@ spec:
             cpuProfiling:
               description: Foo is an example field of CPUProfile. Edit CPUProfile_types.go
                 to remove/update
-              items:
-                properties:
-                  timezone:
-                    type: string
-                  value:
-                    type: string
-                required:
-                - timezone
-                - value
-                type: object
-              type: array
-            updateTime:
-              type: string
+              properties:
+                updateTime:
+                  type: string
+                value:
+                  type: string
+              required:
+              - updateTime
+              - value
+              type: object
           required:
           - cpuProfiling
-          - updateTime
           type: object
         status:
           description: CPUProfileStatus defines the observed state of CPUProfile

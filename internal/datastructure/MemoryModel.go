@@ -1,7 +1,6 @@
 package datastructure
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
@@ -47,9 +46,6 @@ func (mm *MemoryModel) InsertNewJob(jobName string, namespace string, records []
 	//percentile := computeKPercentile(records, 98)
 
 	job.memoryPrediction = peak
-
-	//log.Print(peak)
-	//log.Print(percentile)
 
 	mm.jobs[jobName+"{"+namespace+"}"] = &job
 }
@@ -121,17 +117,19 @@ func computeMemoryWeightedSignal(records []system.ResourceRecord) {
 	}
 }
 
-func (mm *MemoryModel) GetPrediction(jobName string, namespace string) (string, error) {
+func (mm *MemoryModel) GetPrediction(jobName string, namespace string, predictionTime time.Time) (string, error) {
 	if job, found := mm.jobs[jobName+"{"+namespace+"}"]; !found {
 		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
-		var buff bytes.Buffer
 
-		for _, val := range job.memoryPrediction {
-			buff.WriteString(fmt.Sprintf("%.2f\n", val))
-
+		if predictionTime.Hour() >= 0 && predictionTime.Hour() < 6 {
+			return fmt.Sprintf("%.0f\n", job.memoryPrediction[0]), nil
+		} else if predictionTime.Hour() >= 6 && predictionTime.Hour() < 12 {
+			return fmt.Sprintf("%.0f\n", job.memoryPrediction[1]), nil
+		} else if predictionTime.Hour() >= 12 && predictionTime.Hour() < 18 {
+			return fmt.Sprintf("%.0f\n", job.memoryPrediction[2]), nil
+		} else {
+			return fmt.Sprintf("%.0f\n", job.memoryPrediction[3]), nil
 		}
-
-		return buff.String(), nil
 	}
 }

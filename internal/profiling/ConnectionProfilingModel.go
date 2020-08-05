@@ -8,7 +8,6 @@ import (
 	graph2 "github.io/Liqo/JobProfiler/internal/datastructure"
 	"github.io/Liqo/JobProfiler/internal/system"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -94,47 +93,41 @@ func createConnectionCRD(cp *ConnectionProfiling, jobName string, jobNamespace s
 	}
 
 	// create the CRDs
-	for id, slot := range connJobs {
-		var timeslot string
-
-		if id == 0 {
-			timeslot = "00:00-06:00"
-		} else if id == 1 {
-			timeslot = "06:00-12:00"
-		} else if id == 2 {
-			timeslot = "12:00-18:00"
-		} else if id == 3 {
-			timeslot = "18:00-24:00"
-		}
+	for _, slot := range connJobs {
 
 		for _, con := range slot {
-			buffer.WriteString(timeslot + " ")
+			crdName := "connprofile-" + generateConnectionCRDName(extractDeploymentFromPodName(jobName), con.ConnectedTo, jobNamespace)
 
-			crdName := "connprofile-" + generateConnectionCRDName(extractDeploymentFromPodName(jobName), con.ConnectedTo, timeslot, jobNamespace)
+			resInstance := &v1.ConnectionProfile{}
+			err = cp.crdClient.Get(context.TODO(), client.ObjectKey{
+				Namespace: "profiling",
+				Name:      crdName}, resInstance)
 
-			resInstance := v1.ConnectionProfile{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      crdName,
-					Namespace: "profiling",
-				},
-				Spec: v1.ConnectionProfileSpec{
-					Source_job:            extractDeploymentFromPodName(jobName),
-					Source_namespace:      jobNamespace,
-					Destination_job:       strings.Split(con.ConnectedTo, "{")[0],
-					Destination_namespace: strings.Split(strings.Split(con.ConnectedTo, "{")[1], "}")[0], // !!modifica questa oscenita!!
-					Bandwidth_requirement: fmt.Sprintf("%.2f", con.Bandwidth),
-					UpdateTime:            time.Now().String(),
-					TimeSlot:              timeslot,
-				},
-			}
+			// populate the CR
+			resInstance.Name = crdName
+			resInstance.Namespace = "profiling"
+			resInstance.Spec.Source_job = extractDeploymentFromPodName(jobName)
+			resInstance.Spec.Source_namespace = jobNamespace
+			resInstance.Spec.Destination_job = strings.Split(con.ConnectedTo, "{")[0]
+			resInstance.Spec.Destination_namespace = strings.Split(strings.Split(con.ConnectedTo, "{")[1], "}")[0] // !!modifica questa oscenita!!
+			resInstance.Spec.Bandwidth_requirement = fmt.Sprintf("%.2f", con.Bandwidth)
+			resInstance.Spec.UpdateTime = time.Now().String()
 
-			err = cp.crdClient.Create(context.TODO(), &resInstance)
+			// The Get operation returns error if the resource is not present. If not present we create it,
+			// if present we update it
 			if err != nil {
-				log.Print(err)
+				err = cp.crdClient.Create(context.TODO(), resInstance)
+				if err != nil {
+					log.Print(err)
+				}
+			} else {
+				err = cp.crdClient.Update(context.TODO(), resInstance)
+				if err != nil {
+					log.Print(err)
+				}
 			}
 
 			buffer.WriteString(crdName + "\n")
-
 		}
 	}
 
@@ -145,7 +138,7 @@ func startConnectionUpdateRoutine(cp *ConnectionProfiling) {
 	for {
 		if jobName, jobNamespace, err := cp.graph.GetLastUpdatedJob(); err == nil {
 			updateConnectionGraph(cp, jobName, jobNamespace)
-			createConnectionCRD(cp, jobName, jobNamespace)
+			log.Print("Updated" + createConnectionCRD(cp, jobName, jobNamespace))
 		}
 
 		currTime := time.Now()
@@ -168,9 +161,9 @@ func updateConnectionGraph(cp *ConnectionProfiling, jobName string, jobNamespace
 		return
 	}
 
-	cp.graph.InsertNewJob(extractDeploymentFromPodName(jobName), jobNamespace, mergeRecords(recordsRequest, recordsResponse))
-
-	//log.Print(cp.graph.PrintGraph())
+	if records := mergeRecords(recordsRequest, recordsResponse); len(records) > 0 {
+		cp.graph.InsertNewJob(extractDeploymentFromPodName(jobName), jobNamespace, records)
+	}
 }
 
 func mergeRecords(recordsRequest []system.ConnectionRecord, recordsResponse []system.ConnectionRecord) []system.ConnectionRecord {

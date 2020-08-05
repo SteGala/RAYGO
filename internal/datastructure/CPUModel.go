@@ -1,7 +1,6 @@
 package datastructure
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
@@ -35,7 +34,8 @@ func (cm *CPUModel) InsertNewJob(jobName string, namespace string, records []sys
 	defer cm.mutex.Unlock()
 
 	job := cpuInfo{
-		jobName:       jobName + "{" + namespace + "}",
+		jobName:       jobName,
+		jobNamespace:  namespace,
 		cpuPrediction: make([]float64, timeSlots),
 		lastUpdate:    time.Now(),
 	}
@@ -117,17 +117,19 @@ func computeCPUWeightedSignal(records []system.ResourceRecord) {
 	}
 }
 
-func (cm *CPUModel) GetPrediction(jobName string, namespace string) (string, error) {
+func (cm *CPUModel) GetPrediction(jobName string, namespace string, predictionTime time.Time) (string, error) {
 	if job, found := cm.jobs[jobName+"{"+namespace+"}"]; !found {
 		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
-		var buff bytes.Buffer
 
-		for _, val := range job.cpuPrediction {
-			buff.WriteString(fmt.Sprintf("%.2f\n", val))
-
+		if predictionTime.Hour() >= 0 && predictionTime.Hour() < 6 {
+			return fmt.Sprintf("%.3f\n", job.cpuPrediction[0]), nil
+		} else if predictionTime.Hour() >= 6 && predictionTime.Hour() < 12 {
+			return fmt.Sprintf("%.3f\n", job.cpuPrediction[1]), nil
+		} else if predictionTime.Hour() >= 12 && predictionTime.Hour() < 18 {
+			return fmt.Sprintf("%.3f\n", job.cpuPrediction[2]), nil
+		} else {
+			return fmt.Sprintf("%.3f\n", job.cpuPrediction[3]), nil
 		}
-
-		return buff.String(), nil
 	}
 }
