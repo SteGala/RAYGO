@@ -64,10 +64,16 @@ func (p *ProfilingSystem) Init() error {
 	}
 
 	p.connection.Init(p.prometheus, p.clientCRD)
-	p.memory.Init(p.prometheus, p.clientCRD, system.Memory)
-	p.cpu.Init(p.prometheus, p.clientCRD, system.CPU)
+	log.Print("[CHECKED] Connection graph initialized")
 
-	log.Println("Profiling setup completed")
+	p.memory.Init(p.prometheus, p.clientCRD, system.Memory)
+	log.Print("[CHECKED] Memory model initialized")
+
+	p.cpu.Init(p.prometheus, p.clientCRD, system.CPU)
+	log.Print("[CHECKED] CPU model initialized")
+
+	log.Print("Profiling setup completed")
+	log.Print("")
 
 	return nil
 }
@@ -78,7 +84,7 @@ func printInitialInformation() {
 	log.Print("|      Job Profiler      |")
 	log.Print("--------------------------")
 
-	log.Print(" - Version: v0.1.1")
+	log.Print(" - Version: v0.1.2")
 	log.Print(" - Author: Stefano Galantino")
 	log.Println()
 }

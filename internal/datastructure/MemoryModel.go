@@ -16,7 +16,8 @@ type MemoryModel struct {
 }
 
 type memoryInfo struct {
-	name             string
+	jobName          string
+	jobNamespace     string
 	memoryPrediction []float64
 	lastUpdate       time.Time
 }
@@ -34,7 +35,8 @@ func (mm *MemoryModel) InsertNewJob(jobName string, namespace string, records []
 	defer mm.mutex.Unlock()
 
 	job := memoryInfo{
-		name:             jobName + "{" + namespace + "}",
+		jobName:          jobName,
+		jobNamespace:     namespace,
 		memoryPrediction: make([]float64, timeSlots),
 		lastUpdate:       time.Now(),
 	}
@@ -60,6 +62,31 @@ func (mm *MemoryModel) GetJobLastUpdate(jobName string, namespace string) (time.
 		return job.lastUpdate, nil
 	} else {
 		return time.Now(), errors.New(fmt.Sprintf("Job %s does not exist", jobName))
+	}
+}
+
+func (mm *MemoryModel) GetLastUpdatedJob() (string, string, error) {
+	lastUpdate := time.Now()
+	var jobName, jobNamespace string
+	found := false
+
+	mm.mutex.Lock()
+	defer mm.mutex.Unlock()
+
+	for _, job := range mm.jobs {
+		if job.lastUpdate.Before(lastUpdate) {
+			lastUpdate = job.lastUpdate
+			jobName = job.jobName
+			jobNamespace = job.jobNamespace
+			found = true
+		}
+	}
+
+	if found {
+		// The string appended to the jobName is there for compatibility reason. !!IMPROVE!!
+		return jobName + "-xxxxxxx-xxxx", jobNamespace, nil
+	} else {
+		return "", "", errors.New("the connection graph is empty")
 	}
 }
 

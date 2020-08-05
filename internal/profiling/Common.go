@@ -10,8 +10,8 @@ func generateConnectionCRDName(sjob string, djob string, timeslot string, namesp
 	return hash(sjob + djob + timeslot + namespace)
 }
 
-func generateResourceCRDName(jobName string, namespace string, time string) string {
-	return hash(jobName + namespace + time)
+func generateResourceCRDName(jobName string, namespace string) string {
+	return hash(jobName + namespace)
 }
 
 func hash(s string) string {

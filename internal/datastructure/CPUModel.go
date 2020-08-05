@@ -16,7 +16,8 @@ type CPUModel struct {
 }
 
 type cpuInfo struct {
-	name          string
+	jobName       string
+	jobNamespace  string
 	cpuPrediction []float64
 	lastUpdate    time.Time
 }
@@ -28,13 +29,13 @@ func InitCPUModel() *CPUModel {
 	}
 }
 
-func (mm *CPUModel) InsertNewJob(jobName string, namespace string, records []system.ResourceRecord) {
+func (cm *CPUModel) InsertNewJob(jobName string, namespace string, records []system.ResourceRecord) {
 
-	mm.mutex.Lock()
-	defer mm.mutex.Unlock()
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
 
 	job := cpuInfo{
-		name:          jobName + "{" + namespace + "}",
+		jobName:       jobName + "{" + namespace + "}",
 		cpuPrediction: make([]float64, timeSlots),
 		lastUpdate:    time.Now(),
 	}
@@ -46,17 +47,42 @@ func (mm *CPUModel) InsertNewJob(jobName string, namespace string, records []sys
 
 	job.cpuPrediction = peak
 
-	mm.jobs[jobName+"{"+namespace+"}"] = &job
+	cm.jobs[jobName+"{"+namespace+"}"] = &job
 }
 
-func (mm *CPUModel) GetJobLastUpdate(jobName string, namespace string) (time.Time, error) {
-	mm.mutex.Lock()
-	defer mm.mutex.Unlock()
+func (cm *CPUModel) GetJobLastUpdate(jobName string, namespace string) (time.Time, error) {
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
 
-	if job, found := mm.jobs[jobName+"{"+namespace+"}"]; found {
+	if job, found := cm.jobs[jobName+"{"+namespace+"}"]; found {
 		return job.lastUpdate, nil
 	} else {
 		return time.Now(), errors.New(fmt.Sprintf("Job %s does not exist", jobName))
+	}
+}
+
+func (cm *CPUModel) GetLastUpdatedJob() (string, string, error) {
+	lastUpdate := time.Now()
+	var jobName, jobNamespace string
+	found := false
+
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
+
+	for _, job := range cm.jobs {
+		if job.lastUpdate.Before(lastUpdate) {
+			lastUpdate = job.lastUpdate
+			jobName = job.jobName
+			jobNamespace = job.jobNamespace
+			found = true
+		}
+	}
+
+	if found {
+		// The string appended to the jobName is there for compatibility reason. !!IMPROVE!!
+		return jobName + "-xxxxxxx-xxxx", jobNamespace, nil
+	} else {
+		return "", "", errors.New("the connection graph is empty")
 	}
 }
 
@@ -91,8 +117,8 @@ func computeCPUWeightedSignal(records []system.ResourceRecord) {
 	}
 }
 
-func (mm *CPUModel) GetPrediction(jobName string, namespace string) (string, error) {
-	if job, found := mm.jobs[jobName+"{"+namespace+"}"]; !found {
+func (cm *CPUModel) GetPrediction(jobName string, namespace string) (string, error) {
+	if job, found := cm.jobs[jobName+"{"+namespace+"}"]; !found {
 		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
 		var buff bytes.Buffer

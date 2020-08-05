@@ -9,4 +9,5 @@ type ResourceModel interface {
 	InsertNewJob(jobName string, namespace string, records []system.ResourceRecord)
 	GetJobLastUpdate(jobName string, namespace string) (time.Time, error)
 	GetPrediction(name string, namespace string) (string, error)
+	GetLastUpdatedJob() (string, string, error)
 }

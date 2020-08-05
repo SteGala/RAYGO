@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -18,7 +19,8 @@ type ConnectionGraph struct {
 }
 
 type connectionJob struct {
-	name          string
+	jobName       string
+	jobNamespace  string
 	connectedJobs [][]Connections
 	lastUpdate    time.Time
 }
@@ -44,9 +46,12 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 	cg.mutex.Lock()
 	defer cg.mutex.Unlock()
 
+	//log.Print(differentJobs)
+
 	if _, found := cg.jobs[jobName+"{"+namespace+"}"]; !found {
 		job = &connectionJob{
-			name:          jobName + "{" + namespace + "}",
+			jobName:       jobName,
+			jobNamespace:  namespace,
 			connectedJobs: make([][]Connections, timeSlots),
 			lastUpdate:    time.Now(),
 		}
@@ -59,6 +64,10 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 	}
 
 	for _, name := range differentJobs {
+
+		if name == "" {
+			continue
+		}
 
 		numRecords := make([]int, timeSlots)
 		finalPrediction := make([]float64, timeSlots)
@@ -101,7 +110,8 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 		// if the connected job is not yet in the model we create it
 		if _, found := cg.jobs[name]; !found {
 			jb := connectionJob{
-				name:          name,
+				jobName:       strings.Split(name, "{")[0],
+				jobNamespace:  namespace,
 				connectedJobs: make([][]Connections, timeSlots),
 				lastUpdate:    time.Unix(0, 0), //set the date that will trigger a future update
 			}
@@ -150,7 +160,9 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 	cg.jobs[jobName+"{"+namespace+"}"] = job
 }
 
-func (cg *ConnectionGraph) GetJobLastUpdate(jobName string, namespace string) (time.Time, error) {
+// The function receive as input the name and the namespace of the job and returns
+// the date of the last update for that given job
+func (cg *ConnectionGraph) GetJobUpdateTime(jobName string, namespace string) (time.Time, error) {
 	cg.mutex.Lock()
 	defer cg.mutex.Unlock()
 
@@ -158,6 +170,33 @@ func (cg *ConnectionGraph) GetJobLastUpdate(jobName string, namespace string) (t
 		return job.lastUpdate, nil
 	} else {
 		return time.Now(), errors.New(fmt.Sprintf("Job %s does not exist", jobName))
+	}
+}
+
+// The function returns the name and the namespace of the job with the oldest update time
+func (cg *ConnectionGraph) GetLastUpdatedJob() (string, string, error) {
+
+	lastUpdate := time.Now()
+	var jobName, jobNamespace string
+	found := false
+
+	cg.mutex.Lock()
+	defer cg.mutex.Unlock()
+
+	for _, job := range cg.jobs {
+		if job.lastUpdate.Before(lastUpdate) {
+			lastUpdate = job.lastUpdate
+			jobName = job.jobName
+			jobNamespace = job.jobNamespace
+			found = true
+		}
+	}
+
+	if found {
+		// The string appended to the jobName is there for compatibility reason. !!IMPROVE!!
+		return jobName + "-xxxxxxx-xxxx", jobNamespace, nil
+	} else {
+		return "", "", errors.New("the connection graph is empty")
 	}
 }
 
@@ -188,7 +227,7 @@ func (cg *ConnectionGraph) FindSCC(jobName string, namespace string) (string, er
 				visited[name] = false
 			}
 
-			visited[job.name] = true
+			visited[job.jobName+"{"+job.jobNamespace+"}"] = true
 			buffer.WriteString(jobName + "{" + namespace + "}")
 
 			for _, connectedJob := range job.connectedJobs[i] {
@@ -217,7 +256,7 @@ func (cg *ConnectionGraph) PrintGraph() string {
 	buffer.WriteString("-- Connection datastructure --")
 
 	for _, job := range cg.jobs {
-		buffer.WriteString("\nNode: " + job.name)
+		buffer.WriteString("\nNode: " + job.jobName)
 		buffer.WriteString("\n\tConnected to:")
 
 		for i := 0; i < timeSlots; i++ {
@@ -269,7 +308,7 @@ func getDifferentJobNames(records []system.ConnectionRecord) []string {
 			}
 		}
 
-		if !found {
+		if !found && record.To != "" && record.DstNamespace != "" {
 			differentJobs = append(differentJobs, record.To+"{"+record.DstNamespace+"}")
 		}
 	}
