@@ -203,7 +203,7 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 		return nil, err
 	}
 
-	records := make([]ConnectionRecord, 100)
+	records := make([]ConnectionRecord, 0, 100)
 
 	for _, pd := range res.Data.Result {
 

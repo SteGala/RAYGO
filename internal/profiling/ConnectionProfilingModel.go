@@ -162,6 +162,7 @@ func updateConnectionGraph(cp *ConnectionProfiling, jobName string, jobNamespace
 	}
 
 	if records := mergeRecords(recordsRequest, recordsResponse); len(records) > 0 {
+		log.Print(len(records))
 		cp.graph.InsertNewJob(extractDeploymentFromPodName(jobName), jobNamespace, records)
 	}
 }
