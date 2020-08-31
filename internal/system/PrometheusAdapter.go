@@ -1,6 +1,7 @@
 package system
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -84,20 +85,8 @@ type prometheusResultResource struct {
 }
 
 type prometheusMetricResource struct {
-	__name__                string
-	Beta_kubernetes_io_arch string
-	Beta_kubernetes_io_os   string
-	Container               string
-	Id                      string
-	Image                   string
-	Instance                string
-	Job                     string
-	Kubernetes_io_arch      string
-	Kubernetes_io_hostname  string
-	Kubernetes_io_os        string
-	Name                    string
-	Namespace               string
-	Pod                     string
+	Namespace string
+	Pod       string
 }
 
 type prometheusValuesResource struct {
@@ -129,8 +118,14 @@ type ConnectionRecord struct {
 }
 
 type ResourceRecord struct {
-	Date  time.Time
-	Value float64
+	PodInformation Job
+	Date           time.Time
+	Value          float64
+}
+
+type Job struct {
+	Name      string
+	Namespace string
 }
 
 func (p *PrometheusProvider) InitPrometheusSystem() error {
@@ -198,8 +193,8 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 		return nil, err
 	}
 
-	err = json.Unmarshal(body, &res)
 	if err != nil {
+		err = json.Unmarshal(body, &res)
 		return nil, err
 	}
 
@@ -261,6 +256,9 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 		for _, m := range pd.Values {
 			var record ResourceRecord
 
+			record.PodInformation.Name = pd.Metric.Pod
+			record.PodInformation.Namespace = pd.Metric.Namespace
+
 			val, err := strconv.ParseFloat(m.Value, 64)
 			if err != nil {
 				return nil, err
@@ -275,6 +273,100 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 
 	return records, nil
 }
+
+func (p *PrometheusProvider) GetCPUThrottlingRecords(jobs []Job) ([]ResourceRecord, error) {
+	// ricorda che i job name sono nella forma nginx-xxxx-xxxxxx, devi togliere l'ultima parte
+
+	var res prometheusQueryResultResource
+	var records []ResourceRecord
+
+	for _, j := range jobs {
+		split := strings.Split(j.Name, "-")
+		l := len(split) - 2
+
+		j.Name = strings.Join(split[:l], "-")
+	}
+
+	end := time.Now().Unix()
+	start := time.Now().Add(time.Second * (-120)).Unix()
+
+	url := generateCPUThrottleURL(p.URLService, p.PortService, jobs, start, end)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("Prometheus is not reachable at %s:%s", p.URLService, p.PortService))
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(body, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	records = make([]ResourceRecord, 0, 100)
+
+	for _, pd := range res.Data.Result {
+
+		for _, m := range pd.Values {
+			var record ResourceRecord
+
+			record.PodInformation.Name = pd.Metric.Pod
+			record.PodInformation.Namespace = pd.Metric.Namespace
+
+			val, err := strconv.ParseFloat(m.Value, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			record.Value = val
+			record.Date = time.Unix(int64(m.TimeStamp), 0)
+
+			records = append(records, record)
+		}
+	}
+
+	return records, nil
+}
+
+func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end int64) string {
+	var differentNamespaces bytes.Buffer
+	var differentPod bytes.Buffer
+
+	for id, job := range jobs {
+		differentNamespaces.WriteString(job.Namespace)
+		if id != len(jobs)-1 {
+			differentNamespaces.WriteString("%7C")
+		} else {
+			differentNamespaces.WriteString("%22%2C%20")
+		}
+	}
+
+	for id, job := range jobs {
+		differentPod.WriteString(job.Name)
+		if id != len(jobs)-1 {
+			differentNamespaces.WriteString(".*%7C")
+		} else {
+			differentNamespaces.WriteString(".*%22%7D%5B1m%5D)")
+		}
+	}
+
+	return "http://" + ip + ":" + port +
+		"api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(label_replace(rate(container_cpu_cfs_throttled_seconds_total%7Bnamespace%3D~%22" +
+		differentNamespaces.String() +
+		"pod%3D~%22" +
+		differentPod.String() +
+		"%2C%20%22pod%22%2C%20%22%241%22%2C%20%22pod%22%2C%20%22(.*)-.%7B5%7D%22))" +
+		"&start=" + strconv.Itoa(int(start)) +
+		"&end=" + strconv.Itoa(int(end)) +
+		"&step=60"
+}
+
+// sum by (pod) (label_replace(rate(container_cpu_cfs_throttled_seconds_total{}[1m]), "pod", "$1", "pod", "(.*)-.{5}"))
 
 func generateConnectionURL(ip string, port string, podName string, namespace string, requestType string, start int64, end int64) string {
 	return "http://" + ip + ":" + port +
@@ -311,6 +403,5 @@ func generateResourceURL(ip string, port string, podName string, namespace strin
 			"&step=60"
 	}
 
+	// sum by (pod) (rate (container_cpu_usage_seconds_total{image!="", pod!=""}[1m]))
 }
-
-// sum by (pod) (rate (container_cpu_usage_seconds_total{image!="", pod!=""}[1m]))

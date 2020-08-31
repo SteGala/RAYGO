@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -19,14 +18,13 @@ type ConnectionGraph struct {
 }
 
 type connectionJob struct {
-	jobName       string
-	jobNamespace  string
-	connectedJobs [][]Connections
-	lastUpdate    time.Time
+	jobInformation system.Job
+	connectedJobs  [][]connections
+	lastUpdate     time.Time
 }
 
-type Connections struct {
-	ConnectedTo string
+type connections struct {
+	ConnectedTo system.Job
 	Bandwidth   float64
 }
 
@@ -37,7 +35,7 @@ func InitConnectionGraph() *ConnectionGraph {
 	}
 }
 
-func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, records []system.ConnectionRecord) {
+func (cg *ConnectionGraph) InsertNewJob(jobName string, jobNamespace string, records []system.ConnectionRecord) {
 
 	var job *connectionJob
 
@@ -46,32 +44,30 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 	cg.mutex.Lock()
 	defer cg.mutex.Unlock()
 
-	if _, found := cg.jobs[jobName+"{"+namespace+"}"]; !found {
+	if _, found := cg.jobs[generateMapKey(jobName, jobNamespace)]; !found {
 		job = &connectionJob{
-			jobName:       jobName,
-			jobNamespace:  namespace,
-			connectedJobs: make([][]Connections, timeSlots),
+			jobInformation: system.Job{
+				Name:      jobName,
+				Namespace: jobNamespace,
+			},
+			connectedJobs: make([][]connections, timeSlots),
 			lastUpdate:    time.Now(),
 		}
 
 		for i := 0; i < timeSlots; i++ {
-			job.connectedJobs[i] = make([]Connections, 0, 5)
+			job.connectedJobs[i] = make([]connections, 0, 5)
 		}
 	} else {
-		job = cg.jobs[jobName+"{"+namespace+"}"]
+		job = cg.jobs[generateMapKey(jobName, jobNamespace)]
 	}
 
-	for _, name := range differentJobs {
-
-		if name == "" {
-			continue
-		}
+	for _, jobInfo := range differentJobs {
 
 		numRecords := make([]int, timeSlots)
 		finalPrediction := make([]float64, timeSlots)
 		for _, record := range records {
 
-			if record.To+"{"+record.DstNamespace+"}" == name {
+			if record.To == jobInfo.Name && record.DstNamespace == jobInfo.Namespace {
 
 				if record.Date.Hour() >= 0 && record.Date.Hour() < 6 {
 					numRecords[0]++
@@ -106,19 +102,21 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 		}
 
 		// if the connected job is not yet in the model we create it
-		if _, found := cg.jobs[name]; !found {
+		if _, found := cg.jobs[generateMapKey(jobInfo.Name, jobInfo.Namespace)]; !found {
 			jb := connectionJob{
-				jobName:       strings.Split(name, "{")[0],
-				jobNamespace:  namespace,
-				connectedJobs: make([][]Connections, timeSlots),
+				jobInformation: system.Job{
+					Name:      jobInfo.Name,
+					Namespace: jobInfo.Namespace,
+				},
+				connectedJobs: make([][]connections, timeSlots),
 				lastUpdate:    time.Unix(0, 0), //set the date that will trigger a future update
 			}
 
 			for j := 0; j < timeSlots; j++ {
-				jb.connectedJobs[j] = make([]Connections, 0, 5)
+				jb.connectedJobs[j] = make([]connections, 0, 5)
 			}
 
-			cg.jobs[name] = &jb
+			cg.jobs[generateMapKey(jobInfo.Name, jobInfo.Namespace)] = &jb
 		}
 
 		for i := 0; i < timeSlots; i++ {
@@ -127,8 +125,8 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 				continue
 			}
 
-			con := Connections{
-				ConnectedTo: name,
+			con := connections{
+				ConnectedTo: jobInfo,
 				Bandwidth:   finalPrediction[i],
 			}
 
@@ -148,29 +146,32 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, namespace string, record
 
 			// append the same prediction to the other job (if not present)
 			// update the prediction (if present)
-			con2 := Connections{
-				ConnectedTo: jobName + "{" + namespace + "}",
-				Bandwidth:   finalPrediction[i],
+			con2 := connections{
+				ConnectedTo: system.Job{
+					Name:      jobName,
+					Namespace: jobNamespace,
+				},
+				Bandwidth: finalPrediction[i],
 			}
 			found = false
-			for id, j := range cg.jobs[name].connectedJobs[i] {
-				if j.ConnectedTo == jobName+"{"+namespace+"}" {
+			for id, j := range cg.jobs[generateMapKey(jobInfo.Name, jobInfo.Namespace)].connectedJobs[i] {
+				if j.ConnectedTo.Name == jobName && j.ConnectedTo.Namespace == jobNamespace {
 					found = true
-					cg.jobs[name].connectedJobs[i][id] = con2
+					cg.jobs[generateMapKey(jobInfo.Name, jobInfo.Namespace)].connectedJobs[i][id] = con2
 					break
 				}
 			}
 
 			if !found {
-				cg.jobs[name].connectedJobs[i] = append(cg.jobs[name].connectedJobs[i], con2)
+				cg.jobs[generateMapKey(jobInfo.Name, jobInfo.Namespace)].connectedJobs[i] = append(cg.jobs[generateMapKey(jobInfo.Name, jobInfo.Namespace)].connectedJobs[i], con2)
 			}
 		}
 	}
 
-	cg.jobs[jobName+"{"+namespace+"}"] = job
+	cg.jobs[generateMapKey(jobName, jobNamespace)] = job
 }
 
-// The function receive as input the name and the namespace of the job and returns
+// The function receive as input the Name and the Namespace of the job and returns
 // the date of the last update for that given job
 func (cg *ConnectionGraph) GetJobUpdateTime(jobName string, namespace string) (time.Time, error) {
 	cg.mutex.Lock()
@@ -183,7 +184,7 @@ func (cg *ConnectionGraph) GetJobUpdateTime(jobName string, namespace string) (t
 	}
 }
 
-// The function returns the name and the namespace of the job with the oldest update time
+// The function returns the Name and the Namespace of the job with the oldest update time
 func (cg *ConnectionGraph) GetLastUpdatedJob() (string, string, error) {
 
 	lastUpdate := time.Now()
@@ -196,8 +197,8 @@ func (cg *ConnectionGraph) GetLastUpdatedJob() (string, string, error) {
 	for _, job := range cg.jobs {
 		if job.lastUpdate.Before(lastUpdate) {
 			lastUpdate = job.lastUpdate
-			jobName = job.jobName
-			jobNamespace = job.jobNamespace
+			jobName = job.jobInformation.Name
+			jobNamespace = job.jobInformation.Namespace
 			found = true
 		}
 	}
@@ -210,25 +211,26 @@ func (cg *ConnectionGraph) GetLastUpdatedJob() (string, string, error) {
 	}
 }
 
-func (cg *ConnectionGraph) GetJobConnections(jobName string, namespace string) ([][]Connections, error) {
+func (cg *ConnectionGraph) GetJobConnections(jobName string, jobNamespace string) ([][]connections, error) {
 	cg.mutex.Lock()
 	defer cg.mutex.Unlock()
 
-	if job, found := cg.jobs[jobName+"{"+namespace+"}"]; !found {
+	if job, found := cg.jobs[generateMapKey(jobName, jobNamespace)]; !found {
 		return nil, errors.New("Job " + jobName + " is not yet present in the model")
 	} else {
 		return job.connectedJobs, nil
 	}
 }
 
-func (cg *ConnectionGraph) FindSCC(jobName string, namespace string) (string, error) {
+func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string) ([]system.Job, error) {
 	var visited map[string]bool
-	var buffer bytes.Buffer
+	var result []system.Job
 
+	result = make([]system.Job, 0, 5)
 	visited = make(map[string]bool, len(cg.jobs))
 
-	if job, found := cg.jobs[jobName+"{"+namespace+"}"]; !found {
-		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
+	if job, found := cg.jobs[generateMapKey(jobName, jobNamespace)]; !found {
+		return nil, errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
 		cg.mutex.Lock()
 
@@ -237,27 +239,25 @@ func (cg *ConnectionGraph) FindSCC(jobName string, namespace string) (string, er
 				visited[name] = false
 			}
 
-			visited[job.jobName+"{"+job.jobNamespace+"}"] = true
-			buffer.WriteString(jobName + "{" + namespace + "}")
+			visited[generateMapKey(job.jobInformation.Name, job.jobInformation.Namespace)] = true
+			result = append(result, system.Job{
+				Name:      job.jobInformation.Name,
+				Namespace: job.jobInformation.Namespace,
+			})
 
 			for _, connectedJob := range job.connectedJobs[i] {
-				if visited[connectedJob.ConnectedTo] == false {
-					buffer.WriteString(" ")
-					if err := DFS(cg, connectedJob, visited, &buffer, i); err != nil {
-						return "", err
+				if visited[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)] == false {
+					if err := DFS(cg, connectedJob, visited, result, i); err != nil {
+						return nil, err
 					}
 				}
-			}
-
-			if i != timeSlots-1 {
-				buffer.WriteString("\n")
 			}
 		}
 
 		cg.mutex.Unlock()
 	}
 
-	return buffer.String(), nil
+	return result, nil
 }
 
 func (cg *ConnectionGraph) PrintGraph() string {
@@ -266,14 +266,14 @@ func (cg *ConnectionGraph) PrintGraph() string {
 	buffer.WriteString("-- Connection datastructure --")
 
 	for _, job := range cg.jobs {
-		buffer.WriteString("\nNode: " + job.jobName)
+		buffer.WriteString("\nNode: " + job.jobInformation.Name)
 		buffer.WriteString("\n\tConnected to:")
 
 		for i := 0; i < timeSlots; i++ {
 			buffer.WriteString("\n\t\tTimeslot: " + strconv.Itoa(i) + "  [ ")
 
 			for _, con := range job.connectedJobs[i] {
-				buffer.WriteString(con.ConnectedTo + "(")
+				buffer.WriteString(con.ConnectedTo.Name + "(")
 				buffer.WriteString(fmt.Sprintf("%.2f", con.Bandwidth))
 				buffer.WriteString(")  ")
 			}
@@ -285,41 +285,46 @@ func (cg *ConnectionGraph) PrintGraph() string {
 	return buffer.String()
 }
 
-func DFS(cg *ConnectionGraph, connectedJob Connections, visited map[string]bool, buffer *bytes.Buffer, slot int) error {
-	visited[connectedJob.ConnectedTo] = true
-	buffer.WriteString(connectedJob.ConnectedTo)
+func DFS(cg *ConnectionGraph, connectedJob connections, visited map[string]bool, buffer []system.Job, slot int) error {
+	visited[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)] = true
+	buffer = append(buffer, system.Job{
+		Name:      connectedJob.ConnectedTo.Name,
+		Namespace: connectedJob.ConnectedTo.Namespace,
+	})
 
-	if job, found := cg.jobs[connectedJob.ConnectedTo]; found {
+	if job, found := cg.jobs[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)]; found {
 		for _, conn := range job.connectedJobs[slot] {
-			if visited[conn.ConnectedTo] == false {
-				buffer.WriteString(" ")
+			if visited[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)] == false {
 				if err := DFS(cg, conn, visited, buffer, slot); err != nil {
 					return err
 				}
 			}
 		}
 	} else {
-		return errors.New("Job " + connectedJob.ConnectedTo + "not present")
+		return errors.New("Job " + connectedJob.ConnectedTo.Name + "not present")
 	}
 
 	return nil
 }
 
-func getDifferentJobNames(records []system.ConnectionRecord) []string {
-	differentJobs := make([]string, 0, 5)
+func getDifferentJobNames(records []system.ConnectionRecord) []system.Job {
+	differentJobs := make([]system.Job, 0, 5)
 
 	// creates a list with all the different jobs connected to the current connectionJob
 	for _, record := range records {
 		found := false
 
-		for _, name := range differentJobs {
-			if name == record.To+"{"+record.DstNamespace+"}" {
+		for _, j := range differentJobs {
+			if j.Name == record.To && j.Namespace == record.DstNamespace {
 				found = true
 			}
 		}
 
 		if !found && record.To != "" && record.DstNamespace != "" {
-			differentJobs = append(differentJobs, record.To+"{"+record.DstNamespace+"}")
+			differentJobs = append(differentJobs, system.Job{
+				Name:      record.To,
+				Namespace: record.DstNamespace,
+			})
 		}
 	}
 

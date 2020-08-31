@@ -7,36 +7,21 @@ import (
 	v1 "github.io/Liqo/JobProfiler/api/v1"
 	graph2 "github.io/Liqo/JobProfiler/internal/datastructure"
 	"github.io/Liqo/JobProfiler/internal/system"
-	corev1 "k8s.io/api/core/v1"
 	"log"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
 	"time"
 )
 
 type ConnectionProfiling struct {
-	graph                       *graph2.ConnectionGraph
-	prometheus                  *system.PrometheusProvider
-	crdClient                   client.Client
-	backgroundRoutineUpdateTime int
+	graph      *graph2.ConnectionGraph
+	prometheus *system.PrometheusProvider
+	crdClient  client.Client
 }
 
 func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClient client.Client) {
 	cp.prometheus = provider
 	cp.crdClient = crdClient
 	cp.graph = graph2.InitConnectionGraph()
-
-	secondsStr := os.Getenv("BACKGROUND_ROUTINE_UPDATE_TIME")
-	nSec, err := strconv.Atoi(secondsStr)
-	if err != nil {
-		cp.backgroundRoutineUpdateTime = 5
-	} else {
-		cp.backgroundRoutineUpdateTime = nSec
-	}
-
-	go startConnectionUpdateRoutine(cp)
 }
 
 // This function is called every time there is a new pod scheduling request. The behaviour of the
@@ -47,11 +32,11 @@ func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClie
 //  - if the informations are still valid the prediction is computed, instead if the informetions are not present
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
-func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c chan string) {
+func (cp *ConnectionProfiling) ComputePrediction(podName string, podNamespace string, c chan string) {
 	dataAvailable := true
 	validTime := time.Now().AddDate(0, 0, -1)
 
-	lastUpdate, err := cp.graph.GetJobUpdateTime(extractDeploymentFromPodName(pod.Name), pod.Namespace)
+	lastUpdate, err := cp.graph.GetJobUpdateTime(extractDeploymentFromPodName(podName), podNamespace)
 	if err == nil {
 		// means there is already the corresponding job in the datastructure. Given that the job already exists
 		// the time of the last update needs to be checked; only if the records in the datastructure are older than
@@ -60,7 +45,7 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 		if lastUpdate.Before(validTime) {
 			// if last update is before the last valid date the record in the datastructure needs to be updated
 
-			go updateConnectionGraph(cp, pod.Name, pod.Namespace)
+			go cp.updateConnectionGraph(podName, podNamespace)
 			dataAvailable = false
 			c <- "empty"
 		}
@@ -68,21 +53,21 @@ func (cp *ConnectionProfiling) ComputeConnectionsPrediction(pod corev1.Pod, c ch
 	} else {
 		// means that the job is not yet present in the datastructure so it needs to be added
 
-		go updateConnectionGraph(cp, pod.Name, pod.Namespace)
+		go cp.updateConnectionGraph(podName, podNamespace)
 		dataAvailable = false
 		c <- "empty"
 	}
 
 	if dataAvailable {
 
-		podLabels := createConnectionCRD(cp, pod.Name, pod.Namespace)
+		podLabels := cp.createConnectionCRD(podName, podNamespace)
 		c <- podLabels
 	}
 
 	return
 }
 
-func createConnectionCRD(cp *ConnectionProfiling, jobName string, jobNamespace string) string {
+func (cp *ConnectionProfiling) createConnectionCRD(jobName string, jobNamespace string) string {
 	var buffer bytes.Buffer // stores the labels to add to the pod
 
 	// get the prediction for the given job
@@ -96,7 +81,7 @@ func createConnectionCRD(cp *ConnectionProfiling, jobName string, jobNamespace s
 	for _, slot := range connJobs {
 
 		for _, con := range slot {
-			crdName := "connprofile-" + generateConnectionCRDName(extractDeploymentFromPodName(jobName), con.ConnectedTo, jobNamespace)
+			crdName := "connprofile-" + generateConnectionCRDName(extractDeploymentFromPodName(jobName), con.ConnectedTo.Name, jobNamespace)
 
 			resInstance := &v1.ConnectionProfile{}
 			err = cp.crdClient.Get(context.TODO(), client.ObjectKey{
@@ -108,8 +93,8 @@ func createConnectionCRD(cp *ConnectionProfiling, jobName string, jobNamespace s
 			resInstance.Namespace = "profiling"
 			resInstance.Spec.Source_job = extractDeploymentFromPodName(jobName)
 			resInstance.Spec.Source_namespace = jobNamespace
-			resInstance.Spec.Destination_job = strings.Split(con.ConnectedTo, "{")[0]
-			resInstance.Spec.Destination_namespace = strings.Split(strings.Split(con.ConnectedTo, "{")[1], "}")[0] // !!modifica questa oscenita!!
+			resInstance.Spec.Destination_job = con.ConnectedTo.Name
+			resInstance.Spec.Destination_namespace = con.ConnectedTo.Namespace
 			resInstance.Spec.Bandwidth_requirement = fmt.Sprintf("%.2f", con.Bandwidth)
 			resInstance.Spec.UpdateTime = time.Now().String()
 
@@ -134,21 +119,7 @@ func createConnectionCRD(cp *ConnectionProfiling, jobName string, jobNamespace s
 	return buffer.String()
 }
 
-func startConnectionUpdateRoutine(cp *ConnectionProfiling) {
-	for {
-		if jobName, jobNamespace, err := cp.graph.GetLastUpdatedJob(); err == nil {
-			updateConnectionGraph(cp, jobName, jobNamespace)
-			log.Print("Updated" + createConnectionCRD(cp, jobName, jobNamespace))
-		}
-
-		currTime := time.Now()
-		t := currTime.Add(time.Second * time.Duration(cp.backgroundRoutineUpdateTime)).Unix()
-
-		time.Sleep(time.Duration(t-currTime.Unix()) * time.Second)
-	}
-}
-
-func updateConnectionGraph(cp *ConnectionProfiling, jobName string, jobNamespace string) {
+func (cp *ConnectionProfiling) updateConnectionGraph(jobName string, jobNamespace string) {
 	recordsRequest, err := cp.prometheus.GetConnectionRecords(extractDeploymentFromPodName(jobName), jobNamespace, "request")
 	if err != nil {
 		log.Print(err)
@@ -165,6 +136,14 @@ func updateConnectionGraph(cp *ConnectionProfiling, jobName string, jobNamespace
 		log.Print(len(records))
 		cp.graph.InsertNewJob(extractDeploymentFromPodName(jobName), jobNamespace, records)
 	}
+}
+
+func (cp *ConnectionProfiling) GetJobConnections(job system.Job) ([]system.Job, error) {
+	return cp.graph.FindSCC(extractDeploymentFromPodName(job.Name), job.Namespace)
+}
+
+func (cp *ConnectionProfiling) UpdatePrediction(connections []system.Job, connChan chan string) {
+
 }
 
 func mergeRecords(recordsRequest []system.ConnectionRecord, recordsResponse []system.ConnectionRecord) []system.ConnectionRecord {

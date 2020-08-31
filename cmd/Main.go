@@ -14,7 +14,7 @@ func main() {
 		log.Print(err)
 	}
 
-	if err := profiling.StartProfile(os.Getenv("PROFILING_NAMESPACE")); err != nil {
+	if err := profiling.StartProfiling(os.Getenv("PROFILING_NAMESPACE")); err != nil {
 		log.Print(err)
 	}
 

@@ -15,9 +15,11 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"log"
+	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"strconv"
 	"strings"
 	"time"
 	// +kubebuilder:scaffold:imports
@@ -30,12 +32,14 @@ type kubernetesProvider struct {
 }
 
 type ProfilingSystem struct {
-	connection ConnectionProfiling
-	memory     ResourceProfiling
-	cpu        ResourceProfiling
-	prometheus *system.PrometheusProvider
-	client     *kubernetesProvider
-	clientCRD  client.Client
+	connection                  ConnectionProfiling
+	memory                      ResourceProfiling
+	cpu                         ResourceProfiling
+	prometheus                  *system.PrometheusProvider
+	client                      *kubernetesProvider
+	clientCRD                   client.Client
+	backgroundRoutineUpdateTime int
+	backgroundRoutineEnabled    bool
 }
 
 var (
@@ -54,7 +58,8 @@ func init() {
 func (p *ProfilingSystem) Init() error {
 	var err error
 
-	printInitialInformation()
+	p.printInitialInformation()
+	p.readEnvironmentVariables()
 
 	p.prometheus, p.client, err = runPreFlightCheck()
 	if err != nil {
@@ -76,13 +81,18 @@ func (p *ProfilingSystem) Init() error {
 	p.cpu.Init(p.prometheus, p.clientCRD, system.CPU)
 	log.Print("[CHECKED] CPU model initialized")
 
+	if p.backgroundRoutineEnabled {
+		go p.ProfilingBackgroundUpdate()
+		log.Print("[CHECKED] Background update routine created")
+	}
+
 	log.Print("Profiling setup completed")
 	log.Print("")
 
 	return nil
 }
 
-func printInitialInformation() {
+func (p *ProfilingSystem) printInitialInformation() {
 
 	log.Print("--------------------------")
 	log.Print("|      Job Profiler      |")
@@ -91,6 +101,22 @@ func printInitialInformation() {
 	log.Print(" - Version: v0.1.2")
 	log.Print(" - Author: Stefano Galantino")
 	log.Println()
+}
+
+func (p *ProfilingSystem) readEnvironmentVariables() {
+	secondsStr := os.Getenv("BACKGROUND_ROUTINE_UPDATE_TIME")
+	if nSec, err := strconv.Atoi(secondsStr); err != nil {
+		p.backgroundRoutineUpdateTime = 5
+	} else {
+		p.backgroundRoutineUpdateTime = nSec
+	}
+
+	enabled := os.Getenv("BACKGROUND_ROUTINE_ENABLED")
+	if enabled == "TRUE" {
+		p.backgroundRoutineEnabled = true
+	} else {
+		p.backgroundRoutineEnabled = false
+	}
 }
 
 // This function:
@@ -120,7 +146,6 @@ func runPreFlightCheck() (*system.PrometheusProvider, *kubernetesProvider, error
 }
 
 func initKubernetesClient() (*kubernetesProvider, error) {
-
 	//Set to in-cluster config.
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -142,20 +167,18 @@ func initKubernetesClient() (*kubernetesProvider, error) {
 }
 
 func initKubernetesCRDClient() (client.Client, error) {
-
 	return client.New(config.GetConfigOrDie(), client.Options{
 		Scheme: scheme,
 	})
 }
 
-// StartProfile starts the profiling system. It watches for pod creations and triggers:
+// StartProfiling starts the profiling system. It watches for pod creations and triggers:
 //  - ConnectionProfilingModel
 //  - CPUProfilingModel
 //  - MemoryProfilingModel
 // to compute the profiling on each element. Each profiling is executed in a different thread
 // and the execution is synchronized using channels
-func (p *ProfilingSystem) StartProfile(namespace string) error {
-
+func (p *ProfilingSystem) StartProfiling(namespace string) error {
 	watch, err := p.client.client.CoreV1().Pods(namespace).Watch( /*context.TODO(), */ metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -168,11 +191,11 @@ func (p *ProfilingSystem) StartProfile(namespace string) error {
 	for event := range watch.ResultChan() {
 
 		if len(event.Object.(*v1.Pod).Status.Conditions) == 0 {
-			log.Print("Received scheduling request for pod: " + event.Object.(*v1.Pod).Name)
+			log.Print(" - SCHEDULING -\tpod: " + event.Object.(*v1.Pod).Name)
 
-			go p.connection.ComputeConnectionsPrediction(*event.Object.(*v1.Pod), connChan)
-			go p.memory.ComputePrediction(*event.Object.(*v1.Pod), memChan)
-			go p.cpu.ComputePrediction(*event.Object.(*v1.Pod), cpuChan)
+			go p.connection.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, connChan)
+			go p.memory.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, memChan)
+			go p.cpu.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, cpuChan)
 
 			connLabels := <-connChan
 			memLabel := <-memChan
@@ -183,12 +206,44 @@ func (p *ProfilingSystem) StartProfile(namespace string) error {
 				log.Print(err)
 			}
 
-			log.Print("Profiling of pod " + event.Object.(*v1.Pod).Name + " completed")
+			//log.Print("Profiling of pod " + event.Object.(*v1.Pod).Name + " completed")
 		}
-
 	}
 
 	return nil
+}
+
+// ProfilingBackgroundUpdate should be performed in a background routine
+func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
+	//connChan := make(chan string)
+	//memChan := make(chan string)
+	cpuChan := make(chan string)
+
+	for {
+		if job, err := p.memory.data.GetLastUpdatedJob(); err == nil {
+			log.Print(" - BACKGROUND -\tpod: " + job.Name)
+
+			if jobConnections, err := p.connection.GetJobConnections(job); err == nil {
+
+				go p.cpu.UpdatePrediction(jobConnections, cpuChan)
+				//go p.memory.UpdatePrediction(jobConnections, memChan)
+				//go p.connection.UpdatePrediction(jobConnections, connChan)
+
+				//connLabels := <-connChan
+				//memLabel := <-memChan
+				cpuLabel := <-cpuChan
+
+				log.Print(cpuLabel)
+			} else {
+				log.Print(err)
+			}
+		}
+
+		currTime := time.Now()
+		t := currTime.Add(time.Second * time.Duration(p.backgroundRoutineUpdateTime)).Unix()
+
+		time.Sleep(time.Duration(t-currTime.Unix()) * time.Second)
+	}
 }
 
 func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel string, cpuLabel string, pod *v1.Pod) error {

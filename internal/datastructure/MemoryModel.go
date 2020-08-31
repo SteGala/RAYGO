@@ -28,7 +28,7 @@ func InitMemoryModel() *MemoryModel {
 	}
 }
 
-func (mm *MemoryModel) InsertNewJob(jobName string, namespace string, records []system.ResourceRecord) {
+func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord) {
 
 	mm.mutex.Lock()
 	defer mm.mutex.Unlock()
@@ -50,7 +50,7 @@ func (mm *MemoryModel) InsertNewJob(jobName string, namespace string, records []
 	mm.jobs[jobName+"{"+namespace+"}"] = &job
 }
 
-func (mm *MemoryModel) GetJobLastUpdate(jobName string, namespace string) (time.Time, error) {
+func (mm *MemoryModel) GetJobUpdateTime(jobName string, namespace string) (time.Time, error) {
 	mm.mutex.Lock()
 	defer mm.mutex.Unlock()
 
@@ -61,7 +61,7 @@ func (mm *MemoryModel) GetJobLastUpdate(jobName string, namespace string) (time.
 	}
 }
 
-func (mm *MemoryModel) GetLastUpdatedJob() (string, string, error) {
+func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 	lastUpdate := time.Now()
 	var jobName, jobNamespace string
 	found := false
@@ -80,9 +80,15 @@ func (mm *MemoryModel) GetLastUpdatedJob() (string, string, error) {
 
 	if found {
 		// The string appended to the jobName is there for compatibility reason. !!IMPROVE!!
-		return jobName + "-xxxxxxx-xxxx", jobNamespace, nil
+		return system.Job{
+			Name:      jobName + "-xxxxxxx-xxxx",
+			Namespace: jobNamespace,
+		}, nil
 	} else {
-		return "", "", errors.New("the connection graph is empty")
+		return system.Job{
+			Name:      "",
+			Namespace: "",
+		}, errors.New("the memory model is empty")
 	}
 }
 
@@ -94,8 +100,18 @@ func computeMemoryCorrectionConstant(i int) float64 {
 
 func computeMemoryWeightedSignal(records []system.ResourceRecord) {
 	numRecords := make([]int, timeSlots)
-	//finalPrediction := make([][]float64, timeSlots)
+	var podName string
+
+	if len(records) > 0 {
+		podName = records[0].PodInformation.Name
+	}
+
 	for _, record := range records {
+
+		if record.PodInformation.Name != podName {
+			podName = record.PodInformation.Name
+			numRecords = make([]int, timeSlots)
+		}
 
 		if record.Date.Hour() >= 0 && record.Date.Hour() < 6 {
 			record.Value *= computeMemoryCorrectionConstant(numRecords[0])
@@ -117,7 +133,10 @@ func computeMemoryWeightedSignal(records []system.ResourceRecord) {
 	}
 }
 
-func (mm *MemoryModel) GetPrediction(jobName string, namespace string, predictionTime time.Time) (string, error) {
+func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predictionTime time.Time) (string, error) {
+	mm.mutex.Lock()
+	defer mm.mutex.Unlock()
+
 	if job, found := mm.jobs[jobName+"{"+namespace+"}"]; !found {
 		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
@@ -132,4 +151,8 @@ func (mm *MemoryModel) GetPrediction(jobName string, namespace string, predictio
 			return fmt.Sprintf("%.0f\n", job.memoryPrediction[3]), nil
 		}
 	}
+}
+
+func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
+	return
 }

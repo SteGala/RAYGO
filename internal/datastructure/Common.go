@@ -3,12 +3,32 @@ package datastructure
 import (
 	"github.io/Liqo/JobProfiler/internal/system"
 	"sort"
+	"strings"
 )
 
 func computePeakSignal(records []system.ResourceRecord) []float64 {
 	peaksValues := make([]float64, timeSlots)
+	resultValues := make([]float64, timeSlots)
+	countValues := make([]int, timeSlots)
+	var podName string
+
+	if len(records) > 0 {
+		podName = records[0].PodInformation.Name
+	}
 
 	for _, record := range records {
+		if record.PodInformation.Name != podName {
+			for i := 0; i < timeSlots; i++ {
+				if peaksValues[i] > 0 {
+					resultValues[i] += peaksValues[i]
+					countValues[i]++
+				}
+			}
+
+			podName = record.PodInformation.Name
+			peaksValues = make([]float64, timeSlots)
+		}
+
 		if record.Date.Hour() >= 0 && record.Date.Hour() < 6 {
 			if record.Value > peaksValues[0] {
 				peaksValues[0] = record.Value
@@ -28,11 +48,16 @@ func computePeakSignal(records []system.ResourceRecord) []float64 {
 			if record.Value > peaksValues[3] {
 				peaksValues[3] = record.Value
 			}
-
 		}
 	}
 
-	return peaksValues
+	for i := 0; i < timeSlots; i++ {
+		if countValues[i] > 0 {
+			resultValues[i] = resultValues[i] / float64(countValues[i])
+		}
+	}
+
+	return resultValues
 }
 
 // To calculate the kth percentile (where k is any number between zero and one hundred), do the following steps:
@@ -104,4 +129,14 @@ func needsNumberToBeRounded(i float64) bool {
 	} else {
 		return true
 	}
+}
+
+func generateMapKey(jobName string, jobNamespace string) string {
+	return jobName + "{" + jobNamespace + "}"
+}
+
+func extractDeploymentFromPodName(podName string) string {
+	split := strings.Split(podName, "-")
+	l := len(split) - 2
+	return strings.Join(split[:l], "-")
 }
