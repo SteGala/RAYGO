@@ -180,6 +180,7 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 	start := time.Now().AddDate(0, 0, -7).Unix()
 
 	url := generateConnectionURL(p.URLService, p.PortService, jobName, namespace, requestType, start, end)
+	//log.Print(url)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -193,8 +194,8 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 		return nil, err
 	}
 
+	err = json.Unmarshal(body, &res)
 	if err != nil {
-		err = json.Unmarshal(body, &res)
 		return nil, err
 	}
 
@@ -275,8 +276,6 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 }
 
 func (p *PrometheusProvider) GetCPUThrottlingRecords(jobs []Job) ([]ResourceRecord, error) {
-	// ricorda che i job name sono nella forma nginx-xxxx-xxxxxx, devi togliere l'ultima parte
-
 	var res prometheusQueryResultResource
 	var records []ResourceRecord
 
@@ -291,6 +290,7 @@ func (p *PrometheusProvider) GetCPUThrottlingRecords(jobs []Job) ([]ResourceReco
 	start := time.Now().Add(time.Second * (-120)).Unix()
 
 	url := generateCPUThrottleURL(p.URLService, p.PortService, jobs, start, end)
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("Prometheus is not reachable at %s:%s", p.URLService, p.PortService))
@@ -349,14 +349,14 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 	for id, job := range jobs {
 		differentPod.WriteString(job.Name)
 		if id != len(jobs)-1 {
-			differentNamespaces.WriteString(".*%7C")
+			differentPod.WriteString(".*%7C")
 		} else {
-			differentNamespaces.WriteString(".*%22%7D%5B1m%5D)")
+			differentPod.WriteString(".*%22%7D%5B1m%5D)")
 		}
 	}
 
 	return "http://" + ip + ":" + port +
-		"api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(label_replace(rate(container_cpu_cfs_throttled_seconds_total%7Bnamespace%3D~%22" +
+		"/api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(label_replace(rate(container_cpu_cfs_throttled_seconds_total%7Bnamespace%3D~%22" +
 		differentNamespaces.String() +
 		"pod%3D~%22" +
 		differentPod.String() +
@@ -366,21 +366,22 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 		"&step=60"
 }
 
-// sum by (pod) (label_replace(rate(container_cpu_cfs_throttled_seconds_total{}[1m]), "pod", "$1", "pod", "(.*)-.{5}"))
+// sum by (pod, namespace) (label_replace(rate(container_cpu_cfs_throttled_seconds_total{}[1m]), "pod", "$1", "pod", "(.*)-.{5}"))
 
 func generateConnectionURL(ip string, port string, podName string, namespace string, requestType string, start int64, end int64) string {
 	return "http://" + ip + ":" + port +
 		"/api/v1/query_range?query=" +
-		"sum%20by%20(namespace%2C%20source_workload%2C%20destination_workload%2C%20dst_namespace%2C%20destination_workload_namespace)%20(" +
+		"sum%20by(namespace%2C%20source_workload%2C%20destination_workload%2C%20destination_workload_namespace)%20(" +
 		"increase(istio_" + requestType + "_bytes_sum%7B" +
 		"namespace%3D%22" + namespace +
 		"%22%2C%20source_workload%3D%22" + podName +
+		"%22%2C%20destination_workload!%3D%22unknown" +
 		"%22%7D%5B1m%5D))" +
 		"&start=" + strconv.Itoa(int(start)) +
 		"&end=" + strconv.Itoa(int(end)) +
 		"&step=60"
 
-	// sum by(namespace, source_workload, destination_workload, dst_namespace) (increase(istio_request_bytes_sum{namespace="default", source_workload="productpage-v1"}[5m]))
+	// sum by(namespace, source_workload, destination_workload, destination_workload_namespace) (increase(istio_request_bytes_sum{namespace="default", source_workload="productpage-v1"}[1m]))
 }
 
 func generateResourceURL(ip string, port string, podName string, namespace string, start int64, end int64, recordType ResourceType) string {

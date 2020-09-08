@@ -11,4 +11,5 @@ type ResourceModel interface {
 	GetJobUpdateTime(jobName string, namespace string) (time.Time, error)
 	GetLastUpdatedJob() (system.Job, error)
 	GetJobPrediction(name string, namespace string, predictionTime time.Time) (string, error)
+	PrintModel() string
 }

@@ -1,11 +1,12 @@
 package datastructure
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
-	"log"
 	"math"
+	"strings"
 	"sync"
 	"time"
 )
@@ -16,10 +17,9 @@ type CPUModel struct {
 }
 
 type cpuInfo struct {
-	jobName       string
-	jobNamespace  string
-	cpuPrediction []float64
-	lastUpdate    time.Time
+	jobInformation system.Job
+	cpuPrediction  []float64
+	lastUpdate     time.Time
 }
 
 func InitCPUModel() *CPUModel {
@@ -29,14 +29,16 @@ func InitCPUModel() *CPUModel {
 	}
 }
 
-func (cm *CPUModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord) {
+func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord) {
 
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
 
 	job := cpuInfo{
-		jobName:       jobName,
-		jobNamespace:  namespace,
+		jobInformation: system.Job{
+			Name:      jobName,
+			Namespace: namespace,
+		},
 		cpuPrediction: make([]float64, timeSlots),
 		lastUpdate:    time.Now(),
 	}
@@ -48,33 +50,33 @@ func (cm *CPUModel) InsertJob(jobName string, namespace string, records []system
 
 	job.cpuPrediction = peak
 
-	cm.jobs[jobName+"{"+namespace+"}"] = &job
+	cp.jobs[jobName+"{"+namespace+"}"] = &job
 }
 
-func (cm *CPUModel) GetJobUpdateTime(jobName string, namespace string) (time.Time, error) {
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
+func (cp *CPUModel) GetJobUpdateTime(jobName string, namespace string) (time.Time, error) {
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
 
-	if job, found := cm.jobs[jobName+"{"+namespace+"}"]; found {
+	if job, found := cp.jobs[jobName+"{"+namespace+"}"]; found {
 		return job.lastUpdate, nil
 	} else {
 		return time.Now(), errors.New(fmt.Sprintf("Job %s does not exist", jobName))
 	}
 }
 
-func (cm *CPUModel) GetLastUpdatedJob() (system.Job, error) {
+func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 	lastUpdate := time.Now()
 	var jobName, jobNamespace string
 	found := false
 
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
 
-	for _, job := range cm.jobs {
+	for _, job := range cp.jobs {
 		if job.lastUpdate.Before(lastUpdate) {
 			lastUpdate = job.lastUpdate
-			jobName = job.jobName
-			jobNamespace = job.jobNamespace
+			jobName = job.jobInformation.Name
+			jobNamespace = job.jobInformation.Namespace
 			found = true
 		}
 	}
@@ -134,11 +136,11 @@ func computeCPUWeightedSignal(records []system.ResourceRecord) {
 	}
 }
 
-func (cm *CPUModel) GetJobPrediction(jobName string, namespace string, predictionTime time.Time) (string, error) {
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
+func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictionTime time.Time) (string, error) {
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
 
-	if job, found := cm.jobs[jobName+"{"+namespace+"}"]; !found {
+	if job, found := cp.jobs[jobName+"{"+namespace+"}"]; !found {
 		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
 
@@ -154,7 +156,7 @@ func (cm *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 	}
 }
 
-func (cm *CPUModel) UpdateJob(records []system.ResourceRecord) {
+func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 	type result struct {
 		podName       string
 		podNamespace  string
@@ -170,24 +172,31 @@ func (cm *CPUModel) UpdateJob(records []system.ResourceRecord) {
 		job = records[0].PodInformation
 	}
 
-	for _, record := range records {
-		if record.PodInformation.Name != job.Name {
+	for id, record := range records {
+		if record.PodInformation.Name != job.Name || id == len(records)-1 {
 			var avg = 0.0
 
 			if count > 0 {
-				avg = sum / avg
+				avg = sum / float64(count)
 			}
 
+			split := strings.Split(job.Name, "-")
+			l := len(split) - 1
+
 			throttlingInfo = append(throttlingInfo, result{
-				podName:       job.Name,
+				podName:       strings.Join(split[:l], "-"),
 				podNamespace:  job.Namespace,
 				avgThrottling: avg,
 			})
+
+			//log.Print(job)
+			//log.Print(avg)
 
 			sum = 0.0
 			count = 0
 			job = record.PodInformation
 		}
+
 		count++
 		sum += record.Value
 	}
@@ -202,45 +211,62 @@ func (cm *CPUModel) UpdateJob(records []system.ResourceRecord) {
 		avg = avg / float64(len(throttlingInfo))
 	}
 
-	maxThreshold := avg + avg*0.2
-	minThreshold := avg - avg*0.2
+	maxThreshold := avg + avg*0.4
+	minThreshold := avg - avg*0.4
 
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
 
 	for _, t := range throttlingInfo {
-		key := extractDeploymentFromPodName(t.podName) + "{" + t.podNamespace + "}"
+		key := t.podName + "{" + t.podNamespace + "}"
 
-		log.Print(key)
-		_, found := cm.jobs[key]
+		_, found := cp.jobs[key]
+
 		if t.avgThrottling > maxThreshold && found {
-			log.Print("Tuning UP pod " + extractDeploymentFromPodName(t.podName))
 			currTime := time.Now()
 
 			if currTime.Hour() >= 0 && currTime.Hour() < 6 {
-				cm.jobs[key].cpuPrediction[0] += cm.jobs[key].cpuPrediction[0] * 0.2
+				cp.jobs[key].cpuPrediction[0] += cp.jobs[key].cpuPrediction[0] * 0.2
 			} else if currTime.Hour() >= 6 && currTime.Hour() < 12 {
-				cm.jobs[key].cpuPrediction[1] += cm.jobs[key].cpuPrediction[1] * 0.2
+				cp.jobs[key].cpuPrediction[1] += cp.jobs[key].cpuPrediction[1] * 0.2
 			} else if currTime.Hour() >= 12 && currTime.Hour() < 18 {
-				cm.jobs[key].cpuPrediction[2] += cm.jobs[key].cpuPrediction[2] * 0.2
+				cp.jobs[key].cpuPrediction[2] += cp.jobs[key].cpuPrediction[2] * 0.2
 			} else {
-				cm.jobs[key].cpuPrediction[3] += cm.jobs[key].cpuPrediction[3] * 0.2
+				cp.jobs[key].cpuPrediction[3] += cp.jobs[key].cpuPrediction[3] * 0.2
 			}
 		}
 
 		if t.avgThrottling < minThreshold && found {
-			log.Print("Tuning DOWN pod " + extractDeploymentFromPodName(t.podName))
 			currTime := time.Now()
 
 			if currTime.Hour() >= 0 && currTime.Hour() < 6 {
-				cm.jobs[key].cpuPrediction[0] -= cm.jobs[key].cpuPrediction[0] * 0.2
+				cp.jobs[key].cpuPrediction[0] -= cp.jobs[key].cpuPrediction[0] * 0.1
 			} else if currTime.Hour() >= 6 && currTime.Hour() < 12 {
-				cm.jobs[key].cpuPrediction[1] -= cm.jobs[key].cpuPrediction[1] * 0.2
+				cp.jobs[key].cpuPrediction[1] -= cp.jobs[key].cpuPrediction[1] * 0.1
 			} else if currTime.Hour() >= 12 && currTime.Hour() < 18 {
-				cm.jobs[key].cpuPrediction[2] -= cm.jobs[key].cpuPrediction[2] * 0.2
+				cp.jobs[key].cpuPrediction[2] -= cp.jobs[key].cpuPrediction[2] * 0.1
 			} else {
-				cm.jobs[key].cpuPrediction[3] -= cm.jobs[key].cpuPrediction[3] * 0.2
+				cp.jobs[key].cpuPrediction[3] -= cp.jobs[key].cpuPrediction[3] * 0.1
 			}
 		}
+
+		if found {
+			cp.jobs[key].lastUpdate = time.Now()
+		}
 	}
+}
+
+func (cp *CPUModel) PrintModel() string {
+	var buffer bytes.Buffer
+
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
+
+	buffer.WriteString(" -- CPU MODEL -- \n")
+	for _, j := range cp.jobs {
+		buffer.WriteString(j.jobInformation.Name + "{" + j.jobInformation.Namespace + "}\n")
+		buffer.WriteString(fmt.Sprintf("\tPrediction: %.5f\n", j.cpuPrediction))
+	}
+
+	return buffer.String()
 }

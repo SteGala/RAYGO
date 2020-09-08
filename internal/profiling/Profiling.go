@@ -223,7 +223,7 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 		if job, err := p.memory.data.GetLastUpdatedJob(); err == nil {
 			log.Print(" - BACKGROUND -\tpod: " + job.Name)
 
-			if jobConnections, err := p.connection.GetJobConnections(job); err == nil {
+			if jobConnections, err := p.connection.GetJobConnections(job, time.Now()); err == nil {
 
 				go p.cpu.UpdatePrediction(jobConnections, cpuChan)
 				//go p.memory.UpdatePrediction(jobConnections, memChan)
@@ -231,9 +231,9 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 
 				//connLabels := <-connChan
 				//memLabel := <-memChan
-				cpuLabel := <-cpuChan
+				_ = <-cpuChan
 
-				log.Print(cpuLabel)
+				//log.Print(cpuLabel)
 			} else {
 				log.Print(err)
 			}

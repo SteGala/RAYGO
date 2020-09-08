@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
+	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -222,42 +223,72 @@ func (cg *ConnectionGraph) GetJobConnections(jobName string, jobNamespace string
 	}
 }
 
-func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string) ([]system.Job, error) {
-	var visited map[string]bool
-	var result []system.Job
-
-	result = make([]system.Job, 0, 5)
-	visited = make(map[string]bool, len(cg.jobs))
+func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string, time time.Time) ([]system.Job, error) {
+	result := make([]system.Job, 0, 5)
+	visited := make(map[string]bool, len(cg.jobs))
 
 	if job, found := cg.jobs[generateMapKey(jobName, jobNamespace)]; !found {
 		return nil, errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
 		cg.mutex.Lock()
+		defer cg.mutex.Unlock()
 
-		for i := 0; i < timeSlots; i++ {
-			for name, _ := range cg.jobs {
-				visited[name] = false
-			}
+		var i int
 
-			visited[generateMapKey(job.jobInformation.Name, job.jobInformation.Namespace)] = true
-			result = append(result, system.Job{
-				Name:      job.jobInformation.Name,
-				Namespace: job.jobInformation.Namespace,
-			})
+		if time.Hour() >= 0 && time.Hour() < 6 {
+			i = 0
+		} else if time.Hour() >= 6 && time.Hour() < 12 {
+			i = 1
+		} else if time.Hour() >= 12 && time.Hour() < 18 {
+			i = 2
+		} else {
+			i = 3
+		}
 
-			for _, connectedJob := range job.connectedJobs[i] {
-				if visited[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)] == false {
-					if err := DFS(cg, connectedJob, visited, result, i); err != nil {
-						return nil, err
-					}
+		for name := range cg.jobs {
+			visited[name] = false
+		}
+		log.Print("")
+
+		visited[generateMapKey(job.jobInformation.Name, job.jobInformation.Namespace)] = true
+		result = append(result, system.Job{
+			Name:      job.jobInformation.Name,
+			Namespace: job.jobInformation.Namespace,
+		})
+
+		for _, connectedJob := range job.connectedJobs[i] {
+			if visited[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)] == false {
+				if err := DFS(cg, connectedJob, visited, &result, i); err != nil {
+					return nil, err
 				}
 			}
 		}
-
-		cg.mutex.Unlock()
 	}
 
 	return result, nil
+}
+
+func DFS(cg *ConnectionGraph, connectedJob connections, visited map[string]bool, buffer *[]system.Job, slot int) error {
+	visited[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)] = true
+	*buffer = append(*buffer, system.Job{
+		Name:      connectedJob.ConnectedTo.Name,
+		Namespace: connectedJob.ConnectedTo.Namespace,
+	})
+	//log.Print(*buffer)
+
+	if job, found := cg.jobs[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)]; found {
+		for _, conn := range job.connectedJobs[slot] {
+			if visited[generateMapKey(conn.ConnectedTo.Name, conn.ConnectedTo.Namespace)] == false {
+				if err := DFS(cg, conn, visited, buffer, slot); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		return errors.New("Job " + connectedJob.ConnectedTo.Name + "not present")
+	}
+
+	return nil
 }
 
 func (cg *ConnectionGraph) PrintGraph() string {
@@ -283,28 +314,6 @@ func (cg *ConnectionGraph) PrintGraph() string {
 	}
 
 	return buffer.String()
-}
-
-func DFS(cg *ConnectionGraph, connectedJob connections, visited map[string]bool, buffer []system.Job, slot int) error {
-	visited[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)] = true
-	buffer = append(buffer, system.Job{
-		Name:      connectedJob.ConnectedTo.Name,
-		Namespace: connectedJob.ConnectedTo.Namespace,
-	})
-
-	if job, found := cg.jobs[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)]; found {
-		for _, conn := range job.connectedJobs[slot] {
-			if visited[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)] == false {
-				if err := DFS(cg, conn, visited, buffer, slot); err != nil {
-					return err
-				}
-			}
-		}
-	} else {
-		return errors.New("Job " + connectedJob.ConnectedTo.Name + "not present")
-	}
-
-	return nil
 }
 
 func getDifferentJobNames(records []system.ConnectionRecord) []system.Job {

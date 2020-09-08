@@ -120,30 +120,30 @@ func (cp *ConnectionProfiling) createConnectionCRD(jobName string, jobNamespace 
 }
 
 func (cp *ConnectionProfiling) updateConnectionGraph(jobName string, jobNamespace string) {
+	//log.Print("Data in connection graph are not present")
 	recordsRequest, err := cp.prometheus.GetConnectionRecords(extractDeploymentFromPodName(jobName), jobNamespace, "request")
 	if err != nil {
 		log.Print(err)
 		return
 	}
+	//log.Print(len(recordsRequest))
 
 	recordsResponse, err := cp.prometheus.GetConnectionRecords(extractDeploymentFromPodName(jobName), jobNamespace, "response")
 	if err != nil {
 		log.Print(err)
 		return
 	}
+	//log.Print(len(recordsResponse))
 
 	if records := mergeRecords(recordsRequest, recordsResponse); len(records) > 0 {
-		log.Print(len(records))
+		//log.Print(len(records))
 		cp.graph.InsertNewJob(extractDeploymentFromPodName(jobName), jobNamespace, records)
 	}
 }
 
-func (cp *ConnectionProfiling) GetJobConnections(job system.Job) ([]system.Job, error) {
-	return cp.graph.FindSCC(extractDeploymentFromPodName(job.Name), job.Namespace)
-}
-
-func (cp *ConnectionProfiling) UpdatePrediction(connections []system.Job, connChan chan string) {
-
+func (cp *ConnectionProfiling) GetJobConnections(job system.Job, time time.Time) ([]system.Job, error) {
+	//log.Print(cp.graph.PrintGraph())
+	return cp.graph.FindSCC(extractDeploymentFromPodName(job.Name), job.Namespace, time)
 }
 
 func mergeRecords(recordsRequest []system.ConnectionRecord, recordsResponse []system.ConnectionRecord) []system.ConnectionRecord {

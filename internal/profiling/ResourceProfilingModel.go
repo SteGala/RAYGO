@@ -95,22 +95,26 @@ func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan string) 
 		log.Print(err)
 	}
 
-	rp.clientMutex.Lock()
-	defer rp.clientMutex.Unlock()
+	log.Print(rp.data.PrintModel())
 
 	for _, job := range jobs {
 		currTime := time.Now()
 
-		prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(job.Name), job.Namespace, currTime)
+		prediction, err := rp.data.GetJobPrediction(job.Name, job.Namespace, currTime)
 		if err != nil {
 			log.Print(err)
 			c <- "empty"
 			return
 		}
 
-		podLabel := rp.createResourceCRD(job.Name, job.Namespace, prediction, currTime)
-		c <- podLabel
+		rp.clientMutex.Lock()
+
+		_ = rp.createResourceCRD(job.Name, job.Namespace, prediction, currTime)
+
+		rp.clientMutex.Unlock()
 	}
+
+	c <- "finished"
 }
 
 func (rp *ResourceProfiling) createResourceCRD(jobName string, jobNamespace string, prediction string, currTime time.Time) string {
@@ -203,7 +207,7 @@ func (rp *ResourceProfiling) tuneResourceModel(jobs []system.Job) error {
 	var records []system.ResourceRecord
 	var err error
 
-	log.Print("Get informations from Prometheus")
+	//log.Print("Get informations from Prometheus")
 	switch rp.data.(type) {
 	case *datastructure.MemoryModel:
 		//records, err = rp.prometheus.GetResourceTuningRecords(extractDeploymentFromPodName(jobName), jobNamespace, system.Memory)
@@ -216,7 +220,7 @@ func (rp *ResourceProfiling) tuneResourceModel(jobs []system.Job) error {
 		return err
 	}
 
-	log.Print("Update model with informations")
+	//log.Print("Update model with informations")
 	rp.data.UpdateJob(records)
 
 	return nil

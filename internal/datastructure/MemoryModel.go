@@ -1,6 +1,7 @@
 package datastructure
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
@@ -15,8 +16,7 @@ type MemoryModel struct {
 }
 
 type memoryInfo struct {
-	jobName          string
-	jobNamespace     string
+	jobInformation   system.Job
 	memoryPrediction []float64
 	lastUpdate       time.Time
 }
@@ -34,8 +34,10 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 	defer mm.mutex.Unlock()
 
 	job := memoryInfo{
-		jobName:          jobName,
-		jobNamespace:     namespace,
+		jobInformation: system.Job{
+			Name:      jobName,
+			Namespace: namespace,
+		},
 		memoryPrediction: make([]float64, timeSlots),
 		lastUpdate:       time.Now(),
 	}
@@ -72,8 +74,8 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 	for _, job := range mm.jobs {
 		if job.lastUpdate.Before(lastUpdate) {
 			lastUpdate = job.lastUpdate
-			jobName = job.jobName
-			jobNamespace = job.jobNamespace
+			jobName = job.jobInformation.Name
+			jobNamespace = job.jobInformation.Namespace
 			found = true
 		}
 	}
@@ -155,4 +157,16 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 
 func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 	return
+}
+
+func (mm *MemoryModel) PrintModel() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString(" -- MEMORY MODEL -- \n")
+	for _, j := range mm.jobs {
+		buffer.WriteString(j.jobInformation.Name + "{" + j.jobInformation.Namespace + "}\n")
+		buffer.WriteString(fmt.Sprintf("\tPrediction: %.2f\n", j.memoryPrediction))
+	}
+
+	return buffer.String()
 }
