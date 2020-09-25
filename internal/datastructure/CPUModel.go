@@ -31,7 +31,7 @@ func InitCPUModel(timeslots int) *CPUModel {
 	}
 }
 
-func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord) {
+func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord, schedulingTime time.Time) {
 
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
@@ -42,7 +42,7 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 			Namespace: namespace,
 		},
 		cpuPrediction: make([]float64, cp.timeslots),
-		lastUpdate:    time.Now(),
+		lastUpdate:    schedulingTime,
 	}
 
 	computeCPUWeightedSignal(records, cp.timeslots)

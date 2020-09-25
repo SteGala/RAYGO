@@ -173,14 +173,13 @@ func checkServiceAvailability(p *PrometheusProvider) error {
 	return nil
 }
 
-func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace string, requestType string) ([]ConnectionRecord, error) {
+func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace string, requestType string, schedulingTime time.Time) ([]ConnectionRecord, error) {
 	var res prometheusQueryResultConnection
 
-	end := time.Now().Unix()
-	start := time.Now().AddDate(0, 0, -7).Unix()
+	end := schedulingTime.Unix()
+	start := schedulingTime.AddDate(0, 0, -14).Unix()
 
 	url := generateConnectionURL(p.URLService, p.PortService, jobName, namespace, requestType, start, end)
-	//log.Print(url)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -225,12 +224,12 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 	return records, nil
 }
 
-func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string, recordType ResourceType) ([]ResourceRecord, error) {
+func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string, recordType ResourceType, schedulingTime time.Time) ([]ResourceRecord, error) {
 	var res prometheusQueryResultResource
 	var records []ResourceRecord
 
-	end := time.Now().Unix()
-	start := time.Now().AddDate(0, 0, -7).Unix()
+	end := schedulingTime.Unix()
+	start := schedulingTime.AddDate(0, 0, -14).Unix()
 
 	url := generateResourceURL(p.URLService, p.PortService, jobName, namespace, start, end, recordType)
 	resp, err := http.Get(url)

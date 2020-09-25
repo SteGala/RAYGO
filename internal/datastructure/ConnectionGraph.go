@@ -36,8 +36,7 @@ func InitConnectionGraph(timeslots int) *ConnectionGraph {
 	}
 }
 
-func (cg *ConnectionGraph) InsertNewJob(jobName string, jobNamespace string, records []system.ConnectionRecord) {
-
+func (cg *ConnectionGraph) InsertNewJob(jobName string, jobNamespace string, records []system.ConnectionRecord, schedulingTime time.Time) {
 	var job *connectionJob
 
 	differentJobs := getDifferentJobNames(records)
@@ -52,7 +51,7 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, jobNamespace string, rec
 				Namespace: jobNamespace,
 			},
 			connectedJobs: make([][]connections, cg.timeslots),
-			lastUpdate:    time.Now(),
+			lastUpdate:    schedulingTime,
 		}
 
 		for i := 0; i < cg.timeslots; i++ {
@@ -203,14 +202,15 @@ func (cg *ConnectionGraph) GetLastUpdatedJob() (string, string, error) {
 	}
 }
 
-func (cg *ConnectionGraph) GetJobConnections(jobName string, jobNamespace string) ([][]connections, error) {
+func (cg *ConnectionGraph) GetJobConnections(jobName string, jobNamespace string, schedulingTime time.Time) ([]connections, error) {
 	cg.mutex.Lock()
 	defer cg.mutex.Unlock()
 
 	if job, found := cg.jobs[generateMapKey(jobName, jobNamespace)]; !found {
 		return nil, errors.New("Job " + jobName + " is not yet present in the model")
 	} else {
-		return job.connectedJobs, nil
+		id := generateTimeslotIndex(schedulingTime, cg.timeslots)
+		return job.connectedJobs[id], nil
 	}
 }
 

@@ -47,9 +47,9 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient
 //  - if the informations are still valid the prediction is computed, instead if the informetions are not present
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
-func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace string, c chan string) {
+func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace string, c chan string, schedulingTime time.Time) {
 	dataAvailable := true
-	validTime := time.Now().AddDate(0, 0, -1)
+	validTime := schedulingTime.AddDate(0, 0, -1)
 
 	lastUpdate, err := rp.data.GetJobUpdateTime(extractDeploymentFromPodName(podName), podNamespace)
 	if err == nil {
@@ -60,7 +60,7 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 		if lastUpdate.Before(validTime) {
 			// if last update is before the last valid date the record in the datastructure needs to be updated
 
-			go rp.updateResourceModel(podName, podNamespace)
+			go rp.updateResourceModel(podName, podNamespace, schedulingTime)
 			dataAvailable = false
 			c <- "empty"
 		}
@@ -68,24 +68,22 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 	} else {
 		// means that the job is not yet present in the datastructure so it needs to be added
 
-		go rp.updateResourceModel(podName, podNamespace)
+		go rp.updateResourceModel(podName, podNamespace, schedulingTime)
 		dataAvailable = false
 		c <- "empty"
 	}
 
 	if dataAvailable {
-		currTime := time.Now()
-
 		rp.clientMutex.Lock()
 		defer rp.clientMutex.Unlock()
 
-		prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, currTime)
+		prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
 		if err != nil {
 			log.Print(err)
 			c <- "empty"
 		}
 
-		podLabel := rp.createResourceCRD(podName, podNamespace, prediction, currTime)
+		podLabel := rp.createResourceCRD(podName, podNamespace, prediction, schedulingTime)
 		c <- podLabel
 	}
 
@@ -188,15 +186,15 @@ func (rp *ResourceProfiling) createResourceCRD(jobName string, jobNamespace stri
 	return crdName
 }
 
-func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace string) {
+func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace string, schedulingTime time.Time) {
 	var records []system.ResourceRecord
 	var err error
 
 	switch rp.data.(type) {
 	case *datastructure.MemoryModel:
-		records, err = rp.prometheus.GetResourceRecords(extractDeploymentFromPodName(jobName), jobNamespace, system.Memory)
+		records, err = rp.prometheus.GetResourceRecords(extractDeploymentFromPodName(jobName), jobNamespace, system.Memory, schedulingTime)
 	case *datastructure.CPUModel:
-		records, err = rp.prometheus.GetResourceRecords(extractDeploymentFromPodName(jobName), jobNamespace, system.CPU)
+		records, err = rp.prometheus.GetResourceRecords(extractDeploymentFromPodName(jobName), jobNamespace, system.CPU, schedulingTime)
 	default:
 	}
 
@@ -204,9 +202,7 @@ func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace st
 		return
 	}
 
-	rp.data.InsertJob(extractDeploymentFromPodName(jobName), jobNamespace, records)
-
-	log.Print(rp.data.PrintModel())
+	rp.data.InsertJob(extractDeploymentFromPodName(jobName), jobNamespace, records, schedulingTime)
 
 	return
 }

@@ -31,7 +31,7 @@ func InitMemoryModel(timeslots int) *MemoryModel {
 	}
 }
 
-func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord) {
+func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord, schedulingTime time.Time) {
 
 	mm.mutex.Lock()
 	defer mm.mutex.Unlock()
@@ -42,7 +42,7 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 			Namespace: namespace,
 		},
 		memoryPrediction: make([]float64, mm.timeslots),
-		lastUpdate:       time.Now(),
+		lastUpdate:       schedulingTime,
 	}
 
 	computeMemoryWeightedSignal(records, mm.timeslots)

@@ -193,9 +193,11 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 		if len(event.Object.(*v1.Pod).Status.Conditions) == 0 {
 			log.Print(" - SCHEDULING -\tpod: " + event.Object.(*v1.Pod).Name)
 
-			go p.connection.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, connChan)
-			go p.memory.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, memChan)
-			go p.cpu.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, cpuChan)
+			schedulingTime := time.Now()
+
+			go p.connection.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, connChan, schedulingTime)
+			go p.memory.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, memChan, schedulingTime)
+			go p.cpu.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, cpuChan, schedulingTime)
 
 			connLabels := <-connChan
 			memLabel := <-memChan

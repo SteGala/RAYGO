@@ -41,9 +41,9 @@ func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClie
 //  - if the informations are still valid the prediction is computed, instead if the informetions are not present
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
-func (cp *ConnectionProfiling) ComputePrediction(podName string, podNamespace string, c chan string) {
+func (cp *ConnectionProfiling) ComputePrediction(podName string, podNamespace string, c chan string, schedulingTime time.Time) {
 	dataAvailable := true
-	validTime := time.Now().AddDate(0, 0, -1)
+	validTime := schedulingTime.AddDate(0, 0, -1)
 
 	lastUpdate, err := cp.graph.GetJobUpdateTime(extractDeploymentFromPodName(podName), podNamespace)
 	if err == nil {
@@ -54,7 +54,7 @@ func (cp *ConnectionProfiling) ComputePrediction(podName string, podNamespace st
 		if lastUpdate.Before(validTime) {
 			// if last update is before the last valid date the record in the datastructure needs to be updated
 
-			go cp.updateConnectionGraph(podName, podNamespace)
+			go cp.updateConnectionGraph(podName, podNamespace, schedulingTime)
 			dataAvailable = false
 			c <- "empty"
 		}
@@ -62,91 +62,85 @@ func (cp *ConnectionProfiling) ComputePrediction(podName string, podNamespace st
 	} else {
 		// means that the job is not yet present in the datastructure so it needs to be added
 
-		go cp.updateConnectionGraph(podName, podNamespace)
+		go cp.updateConnectionGraph(podName, podNamespace, schedulingTime)
 		dataAvailable = false
 		c <- "empty"
 	}
 
 	if dataAvailable {
 
-		podLabels := cp.createConnectionCRD(podName, podNamespace)
+		podLabels := cp.createConnectionCRD(podName, podNamespace, schedulingTime)
 		c <- podLabels
 	}
 
 	return
 }
 
-func (cp *ConnectionProfiling) createConnectionCRD(jobName string, jobNamespace string) string {
+func (cp *ConnectionProfiling) createConnectionCRD(jobName string, jobNamespace string, schedulingTime time.Time) string {
 	var buffer bytes.Buffer // stores the labels to add to the pod
 
 	// get the prediction for the given job
-	connJobs, err := cp.graph.GetJobConnections(extractDeploymentFromPodName(jobName), jobNamespace)
+	connJobs, err := cp.graph.GetJobConnections(extractDeploymentFromPodName(jobName), jobNamespace, schedulingTime)
 	if err != nil {
 		log.Print(err)
 		return "empty"
 	}
 
 	// create the CRDs
-	for _, slot := range connJobs {
+	for _, con := range connJobs {
+		crdName := "connprofile-" + generateConnectionCRDName(extractDeploymentFromPodName(jobName), con.ConnectedTo.Name, jobNamespace)
 
-		for _, con := range slot {
-			crdName := "connprofile-" + generateConnectionCRDName(extractDeploymentFromPodName(jobName), con.ConnectedTo.Name, jobNamespace)
+		resInstance := &v1.ConnectionProfile{}
+		err = cp.crdClient.Get(context.TODO(), client.ObjectKey{
+			Namespace: "profiling",
+			Name:      crdName}, resInstance)
 
-			resInstance := &v1.ConnectionProfile{}
-			err = cp.crdClient.Get(context.TODO(), client.ObjectKey{
-				Namespace: "profiling",
-				Name:      crdName}, resInstance)
+		// populate the CR
+		resInstance.Name = crdName
+		resInstance.Namespace = "profiling"
+		resInstance.Spec.Source_job = extractDeploymentFromPodName(jobName)
+		resInstance.Spec.Source_namespace = jobNamespace
+		resInstance.Spec.Destination_job = con.ConnectedTo.Name
+		resInstance.Spec.Destination_namespace = con.ConnectedTo.Namespace
+		resInstance.Spec.Bandwidth_requirement = fmt.Sprintf("%.2f", con.Bandwidth)
+		resInstance.Spec.UpdateTime = schedulingTime.String()
 
-			// populate the CR
-			resInstance.Name = crdName
-			resInstance.Namespace = "profiling"
-			resInstance.Spec.Source_job = extractDeploymentFromPodName(jobName)
-			resInstance.Spec.Source_namespace = jobNamespace
-			resInstance.Spec.Destination_job = con.ConnectedTo.Name
-			resInstance.Spec.Destination_namespace = con.ConnectedTo.Namespace
-			resInstance.Spec.Bandwidth_requirement = fmt.Sprintf("%.2f", con.Bandwidth)
-			resInstance.Spec.UpdateTime = time.Now().String()
-
-			// The Get operation returns error if the resource is not present. If not present we create it,
-			// if present we update it
+		// The Get operation returns error if the resource is not present. If not present we create it,
+		// if present we update it
+		if err != nil {
+			err = cp.crdClient.Create(context.TODO(), resInstance)
 			if err != nil {
-				err = cp.crdClient.Create(context.TODO(), resInstance)
-				if err != nil {
-					log.Print(err)
-				}
-			} else {
-				err = cp.crdClient.Update(context.TODO(), resInstance)
-				if err != nil {
-					log.Print(err)
-				}
+				log.Print(err)
 			}
-
-			buffer.WriteString(crdName + "\n")
+		} else {
+			err = cp.crdClient.Update(context.TODO(), resInstance)
+			if err != nil {
+				log.Print(err)
+			}
 		}
+
+		buffer.WriteString(crdName + "\n")
 	}
+
 
 	return buffer.String()
 }
 
-func (cp *ConnectionProfiling) updateConnectionGraph(jobName string, jobNamespace string) {
-	//log.Print("Data in connection graph are not present")
-	recordsRequest, err := cp.prometheus.GetConnectionRecords(extractDeploymentFromPodName(jobName), jobNamespace, "request")
+func (cp *ConnectionProfiling) updateConnectionGraph(jobName string, jobNamespace string, schedulingTime time.Time) {
+	recordsRequest, err := cp.prometheus.GetConnectionRecords(extractDeploymentFromPodName(jobName), jobNamespace, "request", schedulingTime)
 	if err != nil {
 		log.Print(err)
 		return
 	}
-	//log.Print(len(recordsRequest))
 
-	recordsResponse, err := cp.prometheus.GetConnectionRecords(extractDeploymentFromPodName(jobName), jobNamespace, "response")
+	recordsResponse, err := cp.prometheus.GetConnectionRecords(extractDeploymentFromPodName(jobName), jobNamespace, "response", schedulingTime)
 	if err != nil {
 		log.Print(err)
 		return
 	}
-	//log.Print(len(recordsResponse))
 
 	if records := mergeRecords(recordsRequest, recordsResponse); len(records) > 0 {
-		//log.Print(len(records))
-		cp.graph.InsertNewJob(extractDeploymentFromPodName(jobName), jobNamespace, records)
+		cp.graph.InsertNewJob(extractDeploymentFromPodName(jobName), jobNamespace, records, schedulingTime)
 	}
 }
 
