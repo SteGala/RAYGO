@@ -12,8 +12,9 @@ import (
 )
 
 type CPUModel struct {
-	jobs  map[string]*cpuInfo
-	mutex sync.Mutex
+	jobs      map[string]*cpuInfo
+	mutex     sync.Mutex
+	timeslots int
 }
 
 type cpuInfo struct {
@@ -22,10 +23,11 @@ type cpuInfo struct {
 	lastUpdate     time.Time
 }
 
-func InitCPUModel() *CPUModel {
+func InitCPUModel(timeslots int) *CPUModel {
 	return &CPUModel{
-		jobs:  make(map[string]*cpuInfo),
-		mutex: sync.Mutex{},
+		jobs:      make(map[string]*cpuInfo),
+		mutex:     sync.Mutex{},
+		timeslots: timeslots,
 	}
 }
 
@@ -39,16 +41,16 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 			Name:      jobName,
 			Namespace: namespace,
 		},
-		cpuPrediction: make([]float64, timeSlots),
+		cpuPrediction: make([]float64, cp.timeslots),
 		lastUpdate:    time.Now(),
 	}
 
-	computeCPUWeightedSignal(records)
+	computeCPUWeightedSignal(records, cp.timeslots)
 
-	peak := computePeakSignal(records)
-	//percentile := computeKPercentile(records, 98)
+	//peak := computePeakSignal(records, cp.timeslots)
+	percentile := computeKPercentile(records, 98, cp.timeslots)
 
-	job.cpuPrediction = peak
+	job.cpuPrediction = percentile
 
 	cp.jobs[jobName+"{"+namespace+"}"] = &job
 }
@@ -101,7 +103,7 @@ func computeCPUCorrectionConstant(i int) float64 {
 	return math.Exp2(float64(-i / decayTime))
 }
 
-func computeCPUWeightedSignal(records []system.ResourceRecord) {
+func computeCPUWeightedSignal(records []system.ResourceRecord, timeSlots int) {
 	numRecords := make([]int, timeSlots)
 	var podName string
 
@@ -116,23 +118,10 @@ func computeCPUWeightedSignal(records []system.ResourceRecord) {
 			numRecords = make([]int, timeSlots)
 		}
 
-		if record.Date.Hour() >= 0 && record.Date.Hour() < 6 {
-			record.Value *= computeCPUCorrectionConstant(numRecords[0])
-			numRecords[0]++
+		id := generateTimeslotIndex(record.Date, timeSlots)
 
-		} else if record.Date.Hour() >= 6 && record.Date.Hour() < 12 {
-			record.Value *= computeCPUCorrectionConstant(numRecords[1])
-			numRecords[1]++
-
-		} else if record.Date.Hour() >= 12 && record.Date.Hour() < 18 {
-			record.Value *= computeCPUCorrectionConstant(numRecords[2])
-			numRecords[2]++
-
-		} else {
-			record.Value *= computeCPUCorrectionConstant(numRecords[3])
-			numRecords[3]++
-
-		}
+		record.Value *= computeCPUCorrectionConstant(numRecords[id])
+		numRecords[id]++
 	}
 }
 
@@ -144,15 +133,9 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
 
-		if predictionTime.Hour() >= 0 && predictionTime.Hour() < 6 {
-			return fmt.Sprintf("%.3f\n", job.cpuPrediction[0]), nil
-		} else if predictionTime.Hour() >= 6 && predictionTime.Hour() < 12 {
-			return fmt.Sprintf("%.3f\n", job.cpuPrediction[1]), nil
-		} else if predictionTime.Hour() >= 12 && predictionTime.Hour() < 18 {
-			return fmt.Sprintf("%.3f\n", job.cpuPrediction[2]), nil
-		} else {
-			return fmt.Sprintf("%.3f\n", job.cpuPrediction[3]), nil
-		}
+		id := generateTimeslotIndex(predictionTime, cp.timeslots)
+
+		return fmt.Sprintf("%.3f\n", job.cpuPrediction[id]), nil
 	}
 }
 
@@ -225,29 +208,17 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 		if t.avgThrottling > maxThreshold && found {
 			currTime := time.Now()
 
-			if currTime.Hour() >= 0 && currTime.Hour() < 6 {
-				cp.jobs[key].cpuPrediction[0] += cp.jobs[key].cpuPrediction[0] * 0.2
-			} else if currTime.Hour() >= 6 && currTime.Hour() < 12 {
-				cp.jobs[key].cpuPrediction[1] += cp.jobs[key].cpuPrediction[1] * 0.2
-			} else if currTime.Hour() >= 12 && currTime.Hour() < 18 {
-				cp.jobs[key].cpuPrediction[2] += cp.jobs[key].cpuPrediction[2] * 0.2
-			} else {
-				cp.jobs[key].cpuPrediction[3] += cp.jobs[key].cpuPrediction[3] * 0.2
-			}
+			id := generateTimeslotIndex(currTime, cp.timeslots)
+
+			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * 0.2
 		}
 
 		if t.avgThrottling < minThreshold && found {
 			currTime := time.Now()
 
-			if currTime.Hour() >= 0 && currTime.Hour() < 6 {
-				cp.jobs[key].cpuPrediction[0] -= cp.jobs[key].cpuPrediction[0] * 0.1
-			} else if currTime.Hour() >= 6 && currTime.Hour() < 12 {
-				cp.jobs[key].cpuPrediction[1] -= cp.jobs[key].cpuPrediction[1] * 0.1
-			} else if currTime.Hour() >= 12 && currTime.Hour() < 18 {
-				cp.jobs[key].cpuPrediction[2] -= cp.jobs[key].cpuPrediction[2] * 0.1
-			} else {
-				cp.jobs[key].cpuPrediction[3] -= cp.jobs[key].cpuPrediction[3] * 0.1
-			}
+			id := generateTimeslotIndex(currTime, cp.timeslots)
+
+			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * 0.1
 		}
 
 		if found {

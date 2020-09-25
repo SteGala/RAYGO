@@ -20,12 +20,12 @@ spec:
           image: stegala/job-profiler
           env:
           - name: PROMETHEUS_URL
-            value: "172.18.0.2"
+            value: "10.98.228.243"
           - name: PROMETHEUS_PORT
-            value: "30909"
+            value: "9090"
           - name: PROFILING_NAMESPACE
             value: "default" #empty means all the namespaces
           - name: BACKGROUND_ROUTINE_UPDATE_TIME
             value: "60"
           - name: BACKGROUND_ROUTINE_ENABLED
-            value: "TRUE"
+            value: "FALSE"

@@ -11,11 +11,10 @@ import (
 	"time"
 )
 
-const timeSlots = 4
-
 type ConnectionGraph struct {
-	jobs  map[string]*connectionJob
-	mutex sync.Mutex
+	jobs      map[string]*connectionJob
+	mutex     sync.Mutex
+	timeslots int
 }
 
 type connectionJob struct {
@@ -29,10 +28,11 @@ type connections struct {
 	Bandwidth   float64
 }
 
-func InitConnectionGraph() *ConnectionGraph {
+func InitConnectionGraph(timeslots int) *ConnectionGraph {
 	return &ConnectionGraph{
-		jobs:  make(map[string]*connectionJob),
-		mutex: sync.Mutex{},
+		jobs:      make(map[string]*connectionJob),
+		mutex:     sync.Mutex{},
+		timeslots: timeslots,
 	}
 }
 
@@ -51,11 +51,11 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, jobNamespace string, rec
 				Name:      jobName,
 				Namespace: jobNamespace,
 			},
-			connectedJobs: make([][]connections, timeSlots),
+			connectedJobs: make([][]connections, cg.timeslots),
 			lastUpdate:    time.Now(),
 		}
 
-		for i := 0; i < timeSlots; i++ {
+		for i := 0; i < cg.timeslots; i++ {
 			job.connectedJobs[i] = make([]connections, 0, 5)
 		}
 	} else {
@@ -64,25 +64,16 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, jobNamespace string, rec
 
 	for _, jobInfo := range differentJobs {
 
-		numRecords := make([]int, timeSlots)
-		finalPrediction := make([]float64, timeSlots)
+		numRecords := make([]int, cg.timeslots)
+		finalPrediction := make([]float64, cg.timeslots)
 		for _, record := range records {
 
 			if record.To == jobInfo.Name && record.DstNamespace == jobInfo.Namespace {
 
-				if record.Date.Hour() >= 0 && record.Date.Hour() < 6 {
-					numRecords[0]++
-					finalPrediction[0] += record.Bandwidth
-				} else if record.Date.Hour() >= 6 && record.Date.Hour() < 12 {
-					numRecords[1]++
-					finalPrediction[1] += record.Bandwidth
-				} else if record.Date.Hour() >= 12 && record.Date.Hour() < 18 {
-					numRecords[2]++
-					finalPrediction[2] += record.Bandwidth
-				} else {
-					numRecords[3]++
-					finalPrediction[3] += record.Bandwidth
-				}
+				id := generateTimeslotIndex(record.Date, cg.timeslots)
+
+				numRecords[id]++
+				finalPrediction[id] += record.Bandwidth
 			}
 		}
 
@@ -109,18 +100,18 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, jobNamespace string, rec
 					Name:      jobInfo.Name,
 					Namespace: jobInfo.Namespace,
 				},
-				connectedJobs: make([][]connections, timeSlots),
+				connectedJobs: make([][]connections, cg.timeslots),
 				lastUpdate:    time.Unix(0, 0), //set the date that will trigger a future update
 			}
 
-			for j := 0; j < timeSlots; j++ {
+			for j := 0; j < cg.timeslots; j++ {
 				jb.connectedJobs[j] = make([]connections, 0, 5)
 			}
 
 			cg.jobs[generateMapKey(jobInfo.Name, jobInfo.Namespace)] = &jb
 		}
 
-		for i := 0; i < timeSlots; i++ {
+		for i := 0; i < cg.timeslots; i++ {
 
 			if finalPrediction[i] == 0 {
 				continue
@@ -233,17 +224,7 @@ func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string, time tim
 		cg.mutex.Lock()
 		defer cg.mutex.Unlock()
 
-		var i int
-
-		if time.Hour() >= 0 && time.Hour() < 6 {
-			i = 0
-		} else if time.Hour() >= 6 && time.Hour() < 12 {
-			i = 1
-		} else if time.Hour() >= 12 && time.Hour() < 18 {
-			i = 2
-		} else {
-			i = 3
-		}
+		i := generateTimeslotIndex(time, cg.timeslots)
 
 		for name := range cg.jobs {
 			visited[name] = false
@@ -300,7 +281,7 @@ func (cg *ConnectionGraph) PrintGraph() string {
 		buffer.WriteString("\nNode: " + job.jobInformation.Name)
 		buffer.WriteString("\n\tConnected to:")
 
-		for i := 0; i < timeSlots; i++ {
+		for i := 0; i < cg.timeslots; i++ {
 			buffer.WriteString("\n\t\tTimeslot: " + strconv.Itoa(i) + "  [ ")
 
 			for _, con := range job.connectedJobs[i] {

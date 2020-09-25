@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
 	"math"
+	"strings"
 	"sync"
 	"time"
 )
 
 type MemoryModel struct {
-	jobs  map[string]*memoryInfo
-	mutex sync.Mutex
+	jobs      map[string]*memoryInfo
+	mutex     sync.Mutex
+	timeslots int
 }
 
 type memoryInfo struct {
@@ -21,10 +23,11 @@ type memoryInfo struct {
 	lastUpdate       time.Time
 }
 
-func InitMemoryModel() *MemoryModel {
+func InitMemoryModel(timeslots int) *MemoryModel {
 	return &MemoryModel{
-		jobs:  make(map[string]*memoryInfo),
-		mutex: sync.Mutex{},
+		jobs:      make(map[string]*memoryInfo),
+		mutex:     sync.Mutex{},
+		timeslots: timeslots,
 	}
 }
 
@@ -38,13 +41,13 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 			Name:      jobName,
 			Namespace: namespace,
 		},
-		memoryPrediction: make([]float64, timeSlots),
+		memoryPrediction: make([]float64, mm.timeslots),
 		lastUpdate:       time.Now(),
 	}
 
-	computeMemoryWeightedSignal(records)
+	computeMemoryWeightedSignal(records, mm.timeslots)
 
-	peak := computePeakSignal(records)
+	peak := computePeakSignal(records, mm.timeslots)
 	//percentile := computeKPercentile(records, 98)
 
 	job.memoryPrediction = peak
@@ -100,7 +103,7 @@ func computeMemoryCorrectionConstant(i int) float64 {
 	return math.Exp2(float64(-i / decayTime))
 }
 
-func computeMemoryWeightedSignal(records []system.ResourceRecord) {
+func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int) {
 	numRecords := make([]int, timeSlots)
 	var podName string
 
@@ -115,23 +118,9 @@ func computeMemoryWeightedSignal(records []system.ResourceRecord) {
 			numRecords = make([]int, timeSlots)
 		}
 
-		if record.Date.Hour() >= 0 && record.Date.Hour() < 6 {
-			record.Value *= computeMemoryCorrectionConstant(numRecords[0])
-			numRecords[0]++
-
-		} else if record.Date.Hour() >= 6 && record.Date.Hour() < 12 {
-			record.Value *= computeMemoryCorrectionConstant(numRecords[1])
-			numRecords[1]++
-
-		} else if record.Date.Hour() >= 12 && record.Date.Hour() < 18 {
-			record.Value *= computeMemoryCorrectionConstant(numRecords[2])
-			numRecords[2]++
-
-		} else {
-			record.Value *= computeMemoryCorrectionConstant(numRecords[3])
-			numRecords[3]++
-
-		}
+		id := generateTimeslotIndex(record.Date, timeSlots)
+		record.Value *= computeMemoryCorrectionConstant(numRecords[id])
+		numRecords[id]++
 	}
 }
 
@@ -143,20 +132,98 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
 	} else {
 
-		if predictionTime.Hour() >= 0 && predictionTime.Hour() < 6 {
-			return fmt.Sprintf("%.0f\n", job.memoryPrediction[0]), nil
-		} else if predictionTime.Hour() >= 6 && predictionTime.Hour() < 12 {
-			return fmt.Sprintf("%.0f\n", job.memoryPrediction[1]), nil
-		} else if predictionTime.Hour() >= 12 && predictionTime.Hour() < 18 {
-			return fmt.Sprintf("%.0f\n", job.memoryPrediction[2]), nil
-		} else {
-			return fmt.Sprintf("%.0f\n", job.memoryPrediction[3]), nil
-		}
+		id := generateTimeslotIndex(predictionTime, mm.timeslots)
+
+		return fmt.Sprintf("%.0f\n", job.memoryPrediction[id]), nil
 	}
 }
 
 func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
-	return
+	type result struct {
+		podName      string
+		podNamespace string
+		avgFail      float64
+	}
+
+	var job system.Job
+	var sum = 0.0
+	var count = 0
+	memFailInfo := make([]result, 0, 5)
+
+	if len(records) > 0 {
+		job = records[0].PodInformation
+	}
+
+	for id, record := range records {
+		if record.PodInformation.Name != job.Name || id == len(records)-1 {
+			var avg = 0.0
+
+			if count > 0 {
+				avg = sum / float64(count)
+			}
+
+			split := strings.Split(job.Name, "-")
+			l := len(split) - 1
+
+			memFailInfo = append(memFailInfo, result{
+				podName:      strings.Join(split[:l], "-"),
+				podNamespace: job.Namespace,
+				avgFail:      avg,
+			})
+
+			//log.Print(job)
+			//log.Print(avg)
+
+			sum = 0.0
+			count = 0
+			job = record.PodInformation
+		}
+
+		count++
+		sum += record.Value
+	}
+
+	var avg = 0.0
+
+	for _, t := range memFailInfo {
+		avg += t.avgFail
+	}
+
+	if len(memFailInfo) > 0 {
+		avg = avg / float64(len(memFailInfo))
+	}
+
+	maxThreshold := avg + avg*0.4
+	minThreshold := avg - avg*0.4
+
+	mm.mutex.Lock()
+	defer mm.mutex.Unlock()
+
+	for _, t := range memFailInfo {
+		key := t.podName + "{" + t.podNamespace + "}"
+
+		_, found := mm.jobs[key]
+
+		if t.avgFail > maxThreshold && found {
+			currTime := time.Now()
+
+			id := generateTimeslotIndex(currTime, mm.timeslots)
+
+			mm.jobs[key].memoryPrediction[id] += mm.jobs[key].memoryPrediction[id] * 0.2
+		}
+
+		if t.avgFail < minThreshold && found {
+			currTime := time.Now()
+
+			id := generateTimeslotIndex(currTime, mm.timeslots)
+
+			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * 0.1
+		}
+
+		if found {
+			mm.jobs[key].lastUpdate = time.Now()
+		}
+	}
 }
 
 func (mm *MemoryModel) PrintModel() string {

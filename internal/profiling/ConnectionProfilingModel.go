@@ -8,7 +8,9 @@ import (
 	graph2 "github.io/Liqo/JobProfiler/internal/datastructure"
 	"github.io/Liqo/JobProfiler/internal/system"
 	"log"
+	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 	"time"
 )
 
@@ -21,7 +23,14 @@ type ConnectionProfiling struct {
 func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClient client.Client) {
 	cp.prometheus = provider
 	cp.crdClient = crdClient
-	cp.graph = graph2.InitConnectionGraph()
+
+	timeslotStr := os.Getenv("TIMESLOTS")
+	nTimeslots, err := strconv.Atoi(timeslotStr)
+	if err != nil {
+		nTimeslots = 4
+	}
+
+	cp.graph = graph2.InitConnectionGraph(nTimeslots)
 }
 
 // This function is called every time there is a new pod scheduling request. The behaviour of the

@@ -205,8 +205,6 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 				log.Print("Cannot add labels to pod " + event.Object.(*v1.Pod).Name)
 				log.Print(err)
 			}
-
-			//log.Print("Profiling of pod " + event.Object.(*v1.Pod).Name + " completed")
 		}
 	}
 
@@ -216,8 +214,8 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 // ProfilingBackgroundUpdate should be performed in a background routine
 func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 	//connChan := make(chan string)
-	//memChan := make(chan string)
 	cpuChan := make(chan string)
+	memChan := make(chan string)
 
 	for {
 		if job, err := p.memory.data.GetLastUpdatedJob(); err == nil {
@@ -226,14 +224,12 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 			if jobConnections, err := p.connection.GetJobConnections(job, time.Now()); err == nil {
 
 				go p.cpu.UpdatePrediction(jobConnections, cpuChan)
-				//go p.memory.UpdatePrediction(jobConnections, memChan)
+				go p.memory.UpdatePrediction(jobConnections, memChan)
 				//go p.connection.UpdatePrediction(jobConnections, connChan)
 
 				//connLabels := <-connChan
-				//memLabel := <-memChan
+				_ = <-memChan
 				_ = <-cpuChan
-
-				//log.Print(cpuLabel)
 			} else {
 				log.Print(err)
 			}

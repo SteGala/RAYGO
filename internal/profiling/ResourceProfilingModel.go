@@ -7,7 +7,9 @@ import (
 	"github.io/Liqo/JobProfiler/internal/system"
 	"k8s.io/apimachinery/pkg/runtime"
 	"log"
+	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -24,10 +26,16 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient
 	rp.crdClient = crdClient
 	rp.clientMutex = sync.Mutex{}
 
+	timeslotStr := os.Getenv("TIMESLOTS")
+	nTimeslots, err := strconv.Atoi(timeslotStr)
+	if err != nil {
+		nTimeslots = 4
+	}
+
 	if res == system.Memory {
-		rp.data = datastructure.InitMemoryModel()
+		rp.data = datastructure.InitMemoryModel(nTimeslots)
 	} else if res == system.CPU {
-		rp.data = datastructure.InitCPUModel()
+		rp.data = datastructure.InitCPUModel(nTimeslots)
 	}
 }
 
@@ -108,9 +116,7 @@ func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan string) 
 		}
 
 		rp.clientMutex.Lock()
-
 		_ = rp.createResourceCRD(job.Name, job.Namespace, prediction, currTime)
-
 		rp.clientMutex.Unlock()
 	}
 
@@ -124,7 +130,7 @@ func (rp *ResourceProfiling) createResourceCRD(jobName string, jobNamespace stri
 
 	switch rp.data.(type) {
 	case *datastructure.MemoryModel:
-		memspec := v1.MemorySpec{
+		memSpec := v1.MemorySpec{
 			UpdateTime: currTime.String(),
 			Value:      prediction,
 		}
@@ -140,10 +146,10 @@ func (rp *ResourceProfiling) createResourceCRD(jobName string, jobNamespace stri
 
 		myCR.(*v1.MemoryProfile).Name = crdName
 		myCR.(*v1.MemoryProfile).Namespace = "profiling"
-		myCR.(*v1.MemoryProfile).Spec.MemoryProfiling = memspec
+		myCR.(*v1.MemoryProfile).Spec.MemoryProfiling = memSpec
 
 	case *datastructure.CPUModel:
-		cpuspec := v1.CPUSpec{
+		cpuSpec := v1.CPUSpec{
 			UpdateTime: currTime.String(),
 			Value:      prediction,
 		}
@@ -159,7 +165,7 @@ func (rp *ResourceProfiling) createResourceCRD(jobName string, jobNamespace stri
 
 		myCR.(*v1.CPUProfile).Name = crdName
 		myCR.(*v1.CPUProfile).Namespace = "profiling"
-		myCR.(*v1.CPUProfile).Spec.MemoryProfiling = cpuspec
+		myCR.(*v1.CPUProfile).Spec.MemoryProfiling = cpuSpec
 
 	default:
 		return "empty"
@@ -200,6 +206,8 @@ func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace st
 
 	rp.data.InsertJob(extractDeploymentFromPodName(jobName), jobNamespace, records)
 
+	log.Print(rp.data.PrintModel())
+
 	return
 }
 
@@ -207,10 +215,9 @@ func (rp *ResourceProfiling) tuneResourceModel(jobs []system.Job) error {
 	var records []system.ResourceRecord
 	var err error
 
-	//log.Print("Get informations from Prometheus")
 	switch rp.data.(type) {
 	case *datastructure.MemoryModel:
-		//records, err = rp.prometheus.GetResourceTuningRecords(extractDeploymentFromPodName(jobName), jobNamespace, system.Memory)
+		records, err = rp.prometheus.GetMemoryFailRecords(jobs)
 	case *datastructure.CPUModel:
 		records, err = rp.prometheus.GetCPUThrottlingRecords(jobs)
 	default:
@@ -220,7 +227,6 @@ func (rp *ResourceProfiling) tuneResourceModel(jobs []system.Job) error {
 		return err
 	}
 
-	//log.Print("Update model with informations")
 	rp.data.UpdateJob(records)
 
 	return nil
