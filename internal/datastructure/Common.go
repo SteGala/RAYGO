@@ -68,6 +68,16 @@ func computeKPercentile(records []system.ResourceRecord, K int, timeSlots int) [
 	for i := 0; i < timeSlots; i++ {
 		sort.Float64s(sortedRecords[i])
 	}
+	
+	if K == 100 {
+		result := make([]float64, timeSlots)
+
+		for i := 0; i < timeSlots; i++ {
+			result[i] = sortedRecords[i][len(sortedRecords[i]) - 1]
+		}
+
+		return result
+	}
 
 	index := make([]int, timeSlots)
 	rounded := make([]bool, timeSlots)
