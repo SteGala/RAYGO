@@ -44,8 +44,11 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 		memoryPrediction: make([]float64, mm.timeslots),
 		lastUpdate:       schedulingTime,
 	}
+	//log.Print(records)
 
-	computeMemoryWeightedSignal(records, mm.timeslots)
+	computeMemoryWeightedSignal(&records, mm.timeslots)
+
+	//log.Print(records)
 
 	peak := computePeakSignal(records, mm.timeslots)
 	//percentile := computeKPercentile(records, 98)
@@ -98,28 +101,27 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeMemoryCorrectionConstant(i int) float64 {
-	decayTime := 1140
+	decayTime := 11
 
-	return math.Exp2(float64(-i / decayTime))
+	return math.Exp2(float64(-i) / float64(decayTime))
 }
 
-func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int) {
+func computeMemoryWeightedSignal(records *[]system.ResourceRecord, timeSlots int) {
 	numRecords := make([]int, timeSlots)
 	var podName string
 
-	if len(records) > 0 {
-		podName = records[0].PodInformation.Name
+	if len(*records) > 0 {
+		podName = (*records)[0].PodInformation.Name
 	}
 
-	for _, record := range records {
-
-		if record.PodInformation.Name != podName {
-			podName = record.PodInformation.Name
+	for i := len(*records) - 1 ; i >= 0 ; i-- {
+		if (*records)[i].PodInformation.Name != podName {
+			podName = (*records)[i].PodInformation.Name
 			numRecords = make([]int, timeSlots)
 		}
 
-		id := generateTimeslotIndex(record.Date, timeSlots)
-		record.Value *= computeMemoryCorrectionConstant(numRecords[id])
+		id := generateTimeslotIndex((*records)[i].Date, timeSlots)
+		(*records)[i].Value *= computeMemoryCorrectionConstant(numRecords[id])
 		numRecords[id]++
 	}
 }

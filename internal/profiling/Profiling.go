@@ -8,7 +8,6 @@ import (
 	"github.io/Liqo/JobProfiler/internal/system"
 	"gomodules.xyz/jsonpatch/v2"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -66,10 +65,10 @@ func (p *ProfilingSystem) Init() error {
 		return err
 	}
 
-	p.clientCRD, err = initKubernetesCRDClient()
-	if err != nil {
-		return err
-	}
+	//p.clientCRD, err = initKubernetesCRDClient()
+	//if err != nil {
+	//	return err
+	//}
 	log.Print("[CHECKED] Connection clientCRD created")
 
 	p.connection.Init(p.prometheus, p.clientCRD)
@@ -137,7 +136,7 @@ func runPreFlightCheck() (*system.PrometheusProvider, *kubernetesProvider, error
 
 	kubernetes, err = initKubernetesClient()
 	if err != nil {
-		return nil, nil, err
+		//return nil, nil, err
 	}
 
 	log.Print("[CHECKED] Integration with Kubernetes established")
@@ -179,35 +178,16 @@ func initKubernetesCRDClient() (client.Client, error) {
 // to compute the profiling on each element. Each profiling is executed in a different thread
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
-	watch, err := p.client.client.CoreV1().Pods(namespace).Watch( /*context.TODO(), */ metav1.ListOptions{})
+	startDate, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", "Sat, 26 Sep 2020 08:10:00 GMT")
 	if err != nil {
 		return err
 	}
 
-	connChan := make(chan string)
-	memChan := make(chan string)
-	cpuChan := make(chan string)
+	for i := 0 ; i < 5 ; i += 5 {
 
-	for event := range watch.ResultChan() {
-
-		if len(event.Object.(*v1.Pod).Status.Conditions) == 0 {
-			log.Print(" - SCHEDULING -\tpod: " + event.Object.(*v1.Pod).Name)
-
-			schedulingTime := time.Now()
-
-			go p.connection.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, connChan, schedulingTime)
-			go p.memory.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, memChan, schedulingTime)
-			go p.cpu.ComputePrediction(event.Object.(*v1.Pod).Name, event.Object.(*v1.Pod).Namespace, cpuChan, schedulingTime)
-
-			connLabels := <-connChan
-			memLabel := <-memChan
-			cpuLabel := <-cpuChan
-
-			if err := addPodLabels(p.client.client, connLabels, memLabel, cpuLabel, event.Object.(*v1.Pod)); err != nil {
-				log.Print("Cannot add labels to pod " + event.Object.(*v1.Pod).Name)
-				log.Print(err)
-			}
-		}
+		//go p.connection.ComputePrediction("", "", connChan, startDate.Add(time.Minute * time.Duration(i)))
+		p.memory.ComputePrediction("details-v1-fd6fc6749-fsb7q", "default", startDate.Add(time.Minute * time.Duration(i)))
+		//go p.cpu.ComputePrediction("", "", cpuChan, startDate.Add(time.Minute * time.Duration(i)))
 	}
 
 	return nil

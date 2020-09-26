@@ -47,9 +47,9 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient
 //  - if the informations are still valid the prediction is computed, instead if the informetions are not present
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
-func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace string, c chan string, schedulingTime time.Time) {
+func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace string, schedulingTime time.Time) {
 	dataAvailable := true
-	validTime := schedulingTime.AddDate(0, 0, -1)
+	validTime := schedulingTime.Add(time.Minute * (-3))
 
 	lastUpdate, err := rp.data.GetJobUpdateTime(extractDeploymentFromPodName(podName), podNamespace)
 	if err == nil {
@@ -60,17 +60,15 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 		if lastUpdate.Before(validTime) {
 			// if last update is before the last valid date the record in the datastructure needs to be updated
 
-			go rp.updateResourceModel(podName, podNamespace, schedulingTime)
+			rp.updateResourceModel(podName, podNamespace, schedulingTime)
 			dataAvailable = false
-			c <- "empty"
 		}
 
 	} else {
 		// means that the job is not yet present in the datastructure so it needs to be added
 
-		go rp.updateResourceModel(podName, podNamespace, schedulingTime)
+		rp.updateResourceModel(podName, podNamespace, schedulingTime)
 		dataAvailable = false
-		c <- "empty"
 	}
 
 	if dataAvailable {
@@ -80,11 +78,10 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 		prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
 		if err != nil {
 			log.Print(err)
-			c <- "empty"
 		}
 
-		podLabel := rp.createResourceCRD(podName, podNamespace, prediction, schedulingTime)
-		c <- podLabel
+		log.Print(prediction)
+		//_ = rp.createResourceCRD(podName, podNamespace, prediction, schedulingTime)
 	}
 
 	return
@@ -203,6 +200,10 @@ func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace st
 	}
 
 	rp.data.InsertJob(extractDeploymentFromPodName(jobName), jobNamespace, records, schedulingTime)
+
+	prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(jobName), jobNamespace, schedulingTime)
+	log.Print(schedulingTime.String() + " " + prediction)
+	//log.Print(rp.data.PrintModel())
 
 	return
 }

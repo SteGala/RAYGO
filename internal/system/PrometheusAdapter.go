@@ -226,10 +226,10 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 
 func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string, recordType ResourceType, schedulingTime time.Time) ([]ResourceRecord, error) {
 	var res prometheusQueryResultResource
-	var records []ResourceRecord
+	var records = make([]ResourceRecord, 0, 5)
 
 	end := schedulingTime.Unix()
-	start := schedulingTime.AddDate(0, 0, -14).Unix()
+	start := schedulingTime.AddDate(0, 0, -7).Unix()
 
 	url := generateResourceURL(p.URLService, p.PortService, jobName, namespace, start, end, recordType)
 	resp, err := http.Get(url)
@@ -270,7 +270,6 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 			records = append(records, record)
 		}
 	}
-
 	return records, nil
 }
 
@@ -421,7 +420,6 @@ func generateMemoryFailURL(ip string, port string, jobs []Job, start int64, end 
 		"&end=" + strconv.Itoa(int(end)) +
 		"&step=60"
 }
-
 // sum by (pod, namespace) (label_replace(rate(container_memory_failures_total{namespace=~"default|default|default", pod=~"reviews-v1.*|reviews-v2.*|reviews-v3.*", container!=""}[1m]), "pod", "$1", "pod", "(.*)-.{5}"))
 
 func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end int64) string {
