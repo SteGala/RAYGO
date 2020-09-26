@@ -100,7 +100,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 func computeCPUCorrectionConstant(i int) float64 {
 	decayTime := 1140
 
-	return math.Exp2(float64(-i / decayTime))
+	return math.Exp2(float64(-i) / float64(decayTime))
 }
 
 func computeCPUWeightedSignal(records []system.ResourceRecord, timeSlots int) {
@@ -111,16 +111,16 @@ func computeCPUWeightedSignal(records []system.ResourceRecord, timeSlots int) {
 		podName = records[0].PodInformation.Name
 	}
 
-	for _, record := range records {
+	for i := len(records) - 1 ; i >= 0 ; i-- {
 
-		if record.PodInformation.Name != podName {
-			podName = record.PodInformation.Name
+		if records[i].PodInformation.Name != podName {
+			podName = records[i].PodInformation.Name
 			numRecords = make([]int, timeSlots)
 		}
 
-		id := generateTimeslotIndex(record.Date, timeSlots)
+		id := generateTimeslotIndex(records[i].Date, timeSlots)
 
-		record.Value *= computeCPUCorrectionConstant(numRecords[id])
+		records[i].Value *= computeCPUCorrectionConstant(numRecords[id])
 		numRecords[id]++
 	}
 }

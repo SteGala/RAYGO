@@ -100,7 +100,7 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 func computeMemoryCorrectionConstant(i int) float64 {
 	decayTime := 1140
 
-	return math.Exp2(float64(-i / decayTime))
+	return math.Exp2(float64(-i) / float64(decayTime))
 }
 
 func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int) {
@@ -111,15 +111,15 @@ func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int)
 		podName = records[0].PodInformation.Name
 	}
 
-	for _, record := range records {
+	for i := len(records) - 1 ; i >= 0 ; i-- {
 
-		if record.PodInformation.Name != podName {
-			podName = record.PodInformation.Name
+		if records[i].PodInformation.Name != podName {
+			podName = records[i].PodInformation.Name
 			numRecords = make([]int, timeSlots)
 		}
 
-		id := generateTimeslotIndex(record.Date, timeSlots)
-		record.Value *= computeMemoryCorrectionConstant(numRecords[id])
+		id := generateTimeslotIndex(records[i].Date, timeSlots)
+		records[i].Value *= computeMemoryCorrectionConstant(numRecords[id])
 		numRecords[id]++
 	}
 }
