@@ -98,8 +98,6 @@ func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan string) 
 		log.Print(err)
 	}
 
-	log.Print(rp.data.PrintModel())
-
 	for _, job := range jobs {
 		currTime := time.Now()
 

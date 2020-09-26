@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
-	"log"
 	"math"
 	"strings"
 	"sync"
@@ -45,14 +44,28 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 		memoryPrediction: make([]float64, mm.timeslots),
 		lastUpdate:       schedulingTime,
 	}
-	log.Print(records)
+
+	//var buff bytes.Buffer
+	//
+	//for _, r := range records {
+	//	buff.WriteString(fmt.Sprintf("%.0f %s\n", r.Value, r.PodInformation.Name))
+	//}
+	//log.Print(buff.String())
 
 	computeMemoryWeightedSignal(records, mm.timeslots)
 
-	log.Print(records)
+	//var buff2 bytes.Buffer
+	//
+	//for _, r := range records {
+	//	buff2.WriteString(fmt.Sprintf("%.0f %s\n", r.Value, r.PodInformation.Name))
+	//}
+	//log.Print(buff2.String())
 
-	peak := computePeakSignal(records, mm.timeslots)
-	//percentile := computeKPercentile(records, 98)
+	peak := computeKPercentile(records, 100, mm.timeslots)
+	//percentile := computeKPercentile(records, 98, mm.timeslots)
+
+	//log.Print(peak)
+	//log.Print(percentile)
 
 	job.memoryPrediction = peak
 
@@ -102,7 +115,7 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeMemoryCorrectionConstant(i int) float64 {
-	decayTime := 11
+	decayTime := 114
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -112,7 +125,7 @@ func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int)
 	var podName string
 
 	if len(records) > 0 {
-		podName = (records)[0].PodInformation.Name
+		podName = (records)[len(records) - 1].PodInformation.Name
 	}
 
 	for i := len(records) - 1 ; i >= 0 ; i-- {
@@ -136,8 +149,8 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, mm.timeslots)
-
-		return fmt.Sprintf("%.0f\n", job.memoryPrediction[id]), nil
+		prediction := job.memoryPrediction[id] + job.memoryPrediction[id]*0.15
+		return fmt.Sprintf("%.0f\n", prediction), nil
 	}
 }
 

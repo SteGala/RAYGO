@@ -265,7 +265,7 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 			}
 
 			record.Value = val
-			record.Date = time.Unix(int64(m.TimeStamp), 0)
+			record.Date = time.Unix(int64(m.TimeStamp), 0).Add(time.Minute * time.Duration(-120))
 
 			records = append(records, record)
 		}
