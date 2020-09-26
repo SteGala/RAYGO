@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
+	"log"
 	"math"
 	"strings"
 	"sync"
@@ -44,11 +45,11 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 		memoryPrediction: make([]float64, mm.timeslots),
 		lastUpdate:       schedulingTime,
 	}
-	//log.Print(records)
+	log.Print(records)
 
-	computeMemoryWeightedSignal(&records, mm.timeslots)
+	computeMemoryWeightedSignal(records, mm.timeslots)
 
-	//log.Print(records)
+	log.Print(records)
 
 	peak := computePeakSignal(records, mm.timeslots)
 	//percentile := computeKPercentile(records, 98)
@@ -106,22 +107,22 @@ func computeMemoryCorrectionConstant(i int) float64 {
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
 
-func computeMemoryWeightedSignal(records *[]system.ResourceRecord, timeSlots int) {
+func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int) {
 	numRecords := make([]int, timeSlots)
 	var podName string
 
-	if len(*records) > 0 {
-		podName = (*records)[0].PodInformation.Name
+	if len(records) > 0 {
+		podName = (records)[0].PodInformation.Name
 	}
 
-	for i := len(*records) - 1 ; i >= 0 ; i-- {
-		if (*records)[i].PodInformation.Name != podName {
-			podName = (*records)[i].PodInformation.Name
+	for i := len(records) - 1 ; i >= 0 ; i-- {
+		if (records)[i].PodInformation.Name != podName {
+			podName = (records)[i].PodInformation.Name
 			numRecords = make([]int, timeSlots)
 		}
 
-		id := generateTimeslotIndex((*records)[i].Date, timeSlots)
-		(*records)[i].Value *= computeMemoryCorrectionConstant(numRecords[id])
+		id := generateTimeslotIndex((records)[i].Date, timeSlots)
+		(records)[i].Value *= computeMemoryCorrectionConstant(numRecords[id])
 		numRecords[id]++
 	}
 }
