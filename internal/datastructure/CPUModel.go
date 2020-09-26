@@ -108,7 +108,7 @@ func computeCPUWeightedSignal(records []system.ResourceRecord, timeSlots int) {
 	var podName string
 
 	if len(records) > 0 {
-		podName = records[0].PodInformation.Name
+		podName = records[len(records) - 1].PodInformation.Name
 	}
 
 	for i := len(records) - 1 ; i >= 0 ; i-- {
