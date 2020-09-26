@@ -16,8 +16,8 @@ func computePeakSignal(records []system.ResourceRecord, timeSlots int) []float64
 		podName = records[0].PodInformation.Name
 	}
 
-	for _, record := range records {
-		if record.PodInformation.Name != podName {
+	for id, record := range records {
+		if record.PodInformation.Name != podName || id == len(records) - 1 {
 			for i := 0; i < timeSlots; i++ {
 				if peaksValues[i] > 0 {
 					resultValues[i] += peaksValues[i]
