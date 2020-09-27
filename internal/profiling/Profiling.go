@@ -1,6 +1,7 @@
 package profiling
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
@@ -23,6 +24,9 @@ import (
 	"time"
 	// +kubebuilder:scaffold:imports
 )
+
+var bufMem bytes.Buffer
+var bufCPU bytes.Buffer
 
 type kubernetesProvider struct {
 	client    *kubernetes.Clientset
@@ -189,6 +193,11 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 		p.memory.ComputePrediction("details-v1-fd6fc6749-fsb7q", "default", startDate.Add(time.Minute * time.Duration(i)))
 		//go p.cpu.ComputePrediction("", "", cpuChan, startDate.Add(time.Minute * time.Duration(i)))
 	}
+
+	log.Print("--------------")
+	log.Print(bufMem.String())
+	log.Print("--------------")
+	log.Print(bufCPU.String())
 
 	return nil
 }

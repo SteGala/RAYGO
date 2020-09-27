@@ -200,8 +200,14 @@ func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace st
 	rp.data.InsertJob(extractDeploymentFromPodName(jobName), jobNamespace, records, schedulingTime)
 
 	prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(jobName), jobNamespace, schedulingTime)
-	log.Print(schedulingTime.String() + " " + prediction)
-	//log.Print(rp.data.PrintModel())
+
+	switch rp.data.(type) {
+	case *datastructure.MemoryModel:
+		bufMem.WriteString(prediction + " ")
+	case *datastructure.CPUModel:
+		bufCPU.WriteString(prediction + " ")
+	default:
+	}
 
 	return
 }
