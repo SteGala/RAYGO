@@ -203,11 +203,12 @@ func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace st
 
 	switch rp.data.(type) {
 	case *datastructure.MemoryModel:
-		bufMem.WriteString(prediction + " ")
+		bufMem.WriteString(schedulingTime.String() + " " +prediction)
 	case *datastructure.CPUModel:
-		bufCPU.WriteString(prediction + " ")
+		bufCPU.WriteString(schedulingTime.String() + " " +prediction)
 	default:
 	}
+
 
 	return
 }

@@ -1,6 +1,7 @@
 package profiling
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -182,22 +183,50 @@ func initKubernetesCRDClient() (client.Client, error) {
 // to compute the profiling on each element. Each profiling is executed in a different thread
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
-	startDate, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", "Sat, 26 Sep 2020 12:00:00 GMT")
+	startDate, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", "Thu, 02 Jul 2020 00:00:00 GMT")
 	if err != nil {
 		return err
 	}
 
-	for i := 0 ; i < 36*5 ; i += 5 {
+	bufCPU.WriteString("\n")
+	bufMem.WriteString("\n")
+	bufCPU.WriteString("\n")
+	bufMem.WriteString("\n")
+
+	for i := 0 ; i < 8*288*5 ; i += 5 {
+
+		fmt.Println(startDate.Add(time.Minute * time.Duration(i)).String())
 
 		//go p.connection.ComputePrediction("", "", connChan, startDate.Add(time.Minute * time.Duration(i)))
-		p.memory.ComputePrediction("details-v1-fd6fc6749-fsb7q", "default", startDate.Add(time.Minute * time.Duration(i)))
-		//go p.cpu.ComputePrediction("", "", cpuChan, startDate.Add(time.Minute * time.Duration(i)))
+		p.memory.ComputePrediction("grafana-5dc4f8dbf-5gkvk", "monitoring", startDate.Add(time.Minute * time.Duration(i)))
+		p.cpu.ComputePrediction("grafana-5dc4f8dbf-5gkvk", "monitoring", startDate.Add(time.Minute * time.Duration(i)))
 	}
 
-	log.Print("--------------")
-	log.Print(bufMem.String())
-	log.Print("--------------")
-	log.Print(bufCPU.String())
+	bufCPU.WriteString("\n")
+	bufMem.WriteString("\n")
+
+	fMem, err := os.Create("./memProfiling")
+	if err != nil {
+		log.Print(err)
+		return err
+	}
+	defer fMem.Close()
+
+	fCPU, err := os.Create("./cpuProfiling")
+	if err != nil {
+		log.Print(err)
+		return err
+	}
+	defer fCPU.Close()
+
+	w := bufio.NewWriter(fMem)
+	w.WriteString(bufMem.String())
+
+	w2 := bufio.NewWriter(fCPU)
+	w2.WriteString(bufCPU.String())
+
+	w.Flush()
+	w2.Flush()
 
 	return nil
 }

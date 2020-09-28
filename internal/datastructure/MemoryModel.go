@@ -115,7 +115,7 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeMemoryCorrectionConstant(i int) float64 {
-	decayTime := 114
+	decayTime := 1440
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
