@@ -23,6 +23,7 @@ type ResourceType int
 const (
 	Memory ResourceType = 1
 	CPU    ResourceType = 2
+	None   ResourceType = 3
 )
 
 // ----------------------------------------
@@ -177,7 +178,7 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 	var res prometheusQueryResultConnection
 
 	end := schedulingTime.Unix()
-	start := schedulingTime.AddDate(0, 0, -14).Unix()
+	start := schedulingTime.AddDate(0, 0, -7).Unix()
 
 	url := generateConnectionURL(p.URLService, p.PortService, jobName, namespace, requestType, start, end)
 
@@ -229,7 +230,7 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 	var records []ResourceRecord
 
 	end := schedulingTime.Unix()
-	start := schedulingTime.AddDate(0, 0, -14).Unix()
+	start := schedulingTime.AddDate(0, 0, -7).Unix()
 
 	url := generateResourceURL(p.URLService, p.PortService, jobName, namespace, start, end, recordType)
 	resp, err := http.Get(url)
@@ -419,7 +420,7 @@ func generateMemoryFailURL(ip string, port string, jobs []Job, start int64, end 
 		"container!%3D%22%22%7D%5B1m%5D)%2C%20%22pod%22%2C%20%22%241%22%2C%20%22pod%22%2C%20%22(.*)-.%7B5%7D%22))" +
 		"&start=" + strconv.Itoa(int(start)) +
 		"&end=" + strconv.Itoa(int(end)) +
-		"&step=60"
+		"&step=1"
 }
 
 // sum by (pod, namespace) (label_replace(rate(container_memory_failures_total{namespace=~"default|default|default", pod=~"reviews-v1.*|reviews-v2.*|reviews-v3.*", container!=""}[1m]), "pod", "$1", "pod", "(.*)-.{5}"))
@@ -454,7 +455,7 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 		"%2C%20%22pod%22%2C%20%22%241%22%2C%20%22pod%22%2C%20%22(.*)-.%7B5%7D%22))" +
 		"&start=" + strconv.Itoa(int(start)) +
 		"&end=" + strconv.Itoa(int(end)) +
-		"&step=60"
+		"&step=1"
 }
 
 // sum by (pod, namespace) (label_replace(rate(container_cpu_cfs_throttled_seconds_total{}[1m]), "pod", "$1", "pod", "(.*)-.{5}"))

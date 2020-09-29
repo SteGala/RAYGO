@@ -12,9 +12,10 @@ import (
 )
 
 type CPUModel struct {
-	jobs      map[string]*cpuInfo
-	mutex     sync.Mutex
-	timeslots int
+	jobs                   map[string]*cpuInfo
+	mutex                  sync.Mutex
+	timeslots              int
+	cpuThrottlingThreshold float64
 }
 
 type cpuInfo struct {
@@ -23,11 +24,12 @@ type cpuInfo struct {
 	lastUpdate     time.Time
 }
 
-func InitCPUModel(timeslots int) *CPUModel {
+func InitCPUModel(timeslots int, threshold float64) *CPUModel {
 	return &CPUModel{
-		jobs:      make(map[string]*cpuInfo),
-		mutex:     sync.Mutex{},
-		timeslots: timeslots,
+		jobs:                   make(map[string]*cpuInfo),
+		mutex:                  sync.Mutex{},
+		timeslots:              timeslots,
+		cpuThrottlingThreshold: threshold,
 	}
 }
 
@@ -75,7 +77,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 	defer cp.mutex.Unlock()
 
 	for _, job := range cp.jobs {
-		if job.lastUpdate.Before(lastUpdate) {
+		if job.lastUpdate.Before(lastUpdate) && job.jobInformation.Name != "" { //sometimes happens that emtpy job are added to the model !!INVESTIGATE!!
 			lastUpdate = job.lastUpdate
 			jobName = job.jobInformation.Name
 			jobNamespace = job.jobInformation.Namespace
@@ -108,10 +110,10 @@ func computeCPUWeightedSignal(records []system.ResourceRecord, timeSlots int) {
 	var podName string
 
 	if len(records) > 0 {
-		podName = records[len(records) - 1].PodInformation.Name
+		podName = records[len(records)-1].PodInformation.Name
 	}
 
-	for i := len(records) - 1 ; i >= 0 ; i-- {
+	for i := len(records) - 1; i >= 0; i-- {
 
 		if records[i].PodInformation.Name != podName {
 			podName = records[i].PodInformation.Name
@@ -135,7 +137,7 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 
 		id := generateTimeslotIndex(predictionTime, cp.timeslots)
 		prediction := job.cpuPrediction[id] + job.cpuPrediction[id]*0.15
-		return fmt.Sprintf("%.3f\n", prediction), nil
+		return fmt.Sprintf("%.3f", prediction), nil
 	}
 }
 
@@ -150,6 +152,8 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 	var sum = 0.0
 	var count = 0
 	throttlingInfo := make([]result, 0, 5)
+	var maxThreshold float64
+	var minThreshold float64
 
 	if len(records) > 0 {
 		job = records[0].PodInformation
@@ -194,8 +198,13 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 		avg = avg / float64(len(throttlingInfo))
 	}
 
-	maxThreshold := avg + avg*0.4
-	minThreshold := avg - avg*0.4
+	if len(throttlingInfo) == 1 {
+		maxThreshold = cp.cpuThrottlingThreshold + cp.cpuThrottlingThreshold*0.4
+		minThreshold = cp.cpuThrottlingThreshold - cp.cpuThrottlingThreshold*0.4
+	} else {
+		maxThreshold = avg + avg*0.4
+		minThreshold = avg - avg*0.4
+	}
 
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()

@@ -12,9 +12,10 @@ import (
 )
 
 type MemoryModel struct {
-	jobs      map[string]*memoryInfo
-	mutex     sync.Mutex
-	timeslots int
+	jobs                map[string]*memoryInfo
+	mutex               sync.Mutex
+	timeslots           int
+	memoryFailThreshold float64
 }
 
 type memoryInfo struct {
@@ -23,11 +24,12 @@ type memoryInfo struct {
 	lastUpdate       time.Time
 }
 
-func InitMemoryModel(timeslots int) *MemoryModel {
+func InitMemoryModel(timeslots int, threshold float64) *MemoryModel {
 	return &MemoryModel{
-		jobs:      make(map[string]*memoryInfo),
-		mutex:     sync.Mutex{},
-		timeslots: timeslots,
+		jobs:                make(map[string]*memoryInfo),
+		mutex:               sync.Mutex{},
+		timeslots:           timeslots,
+		memoryFailThreshold: threshold,
 	}
 }
 
@@ -47,8 +49,7 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 
 	computeMemoryWeightedSignal(records, mm.timeslots)
 
-	peak := computePeakSignal(records, mm.timeslots)
-	//percentile := computeKPercentile(records, 98)
+	peak := computeKPercentile(records, 100, mm.timeslots)
 
 	job.memoryPrediction = peak
 
@@ -75,7 +76,7 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 	defer mm.mutex.Unlock()
 
 	for _, job := range mm.jobs {
-		if job.lastUpdate.Before(lastUpdate) {
+		if job.lastUpdate.Before(lastUpdate) && job.jobInformation.Name != "" { //sometimes happens that emtpy job are added to the model !!INVESTIGATE!!
 			lastUpdate = job.lastUpdate
 			jobName = job.jobInformation.Name
 			jobNamespace = job.jobInformation.Namespace
@@ -108,10 +109,10 @@ func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int)
 	var podName string
 
 	if len(records) > 0 {
-		podName = records[len(records) - 1].PodInformation.Name
+		podName = records[len(records)-1].PodInformation.Name
 	}
 
-	for i := len(records) - 1 ; i >= 0 ; i-- {
+	for i := len(records) - 1; i >= 0; i-- {
 
 		if records[i].PodInformation.Name != podName {
 			podName = records[i].PodInformation.Name
@@ -134,7 +135,7 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 
 		id := generateTimeslotIndex(predictionTime, mm.timeslots)
 		prediction := job.memoryPrediction[id] + job.memoryPrediction[id]*0.15
-		return fmt.Sprintf("%.0f\n", prediction), nil
+		return fmt.Sprintf("%.0f", prediction), nil
 	}
 }
 
@@ -149,6 +150,8 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 	var sum = 0.0
 	var count = 0
 	memFailInfo := make([]result, 0, 5)
+	var maxThreshold float64
+	var minThreshold float64
 
 	if len(records) > 0 {
 		job = records[0].PodInformation
@@ -171,9 +174,6 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 				avgFail:      avg,
 			})
 
-			//log.Print(job)
-			//log.Print(avg)
-
 			sum = 0.0
 			count = 0
 			job = record.PodInformation
@@ -193,8 +193,13 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 		avg = avg / float64(len(memFailInfo))
 	}
 
-	maxThreshold := avg + avg*0.4
-	minThreshold := avg - avg*0.4
+	if len(memFailInfo) == 1 {
+		maxThreshold = mm.memoryFailThreshold + mm.memoryFailThreshold*0.4
+		minThreshold = mm.memoryFailThreshold - mm.memoryFailThreshold*0.4
+	} else {
+		maxThreshold = avg + avg*0.4
+		minThreshold = avg - avg*0.4
+	}
 
 	mm.mutex.Lock()
 	defer mm.mutex.Unlock()

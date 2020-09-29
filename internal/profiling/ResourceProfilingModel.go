@@ -21,6 +21,15 @@ type ResourceProfiling struct {
 	clientMutex sync.Mutex
 }
 
+type ResourceProfilingValue struct {
+	resourceType system.ResourceType
+	job          system.Job
+	value        string
+	label        string
+}
+
+type ResourceProfilingValues []ResourceProfilingValue
+
 func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient client.Client, res system.ResourceType) {
 	rp.prometheus = provider
 	rp.crdClient = crdClient
@@ -32,10 +41,22 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient
 		nTimeslots = 4
 	}
 
+	cpuThresholdStr := os.Getenv("CPU_THRESHOLD")
+	cpuThreshold, err := strconv.ParseFloat(cpuThresholdStr, 64)
+	if err != nil {
+		cpuThreshold = 0.5
+	}
+
+	memoryThresholdStr := os.Getenv("MEMORY_THRESHOLD")
+	memoryThreshold, err := strconv.ParseFloat(memoryThresholdStr, 64)
+	if err != nil {
+		memoryThreshold = 600.0
+	}
+
 	if res == system.Memory {
-		rp.data = datastructure.InitMemoryModel(nTimeslots)
+		rp.data = datastructure.InitMemoryModel(nTimeslots, memoryThreshold)
 	} else if res == system.CPU {
-		rp.data = datastructure.InitCPUModel(nTimeslots)
+		rp.data = datastructure.InitCPUModel(nTimeslots, cpuThreshold)
 	}
 }
 
@@ -47,7 +68,7 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient
 //  - if the informations are still valid the prediction is computed, instead if the informetions are not present
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
-func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace string, c chan string, schedulingTime time.Time) {
+func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace string, c chan ResourceProfilingValue, schedulingTime time.Time) {
 	dataAvailable := true
 	validTime := schedulingTime.AddDate(0, 0, -1)
 
@@ -62,7 +83,11 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 
 			go rp.updateResourceModel(podName, podNamespace, schedulingTime)
 			dataAvailable = false
-			c <- "empty"
+			c <- ResourceProfilingValue{
+				resourceType: system.None,
+				value:        "",
+				label:        "",
+			}
 		}
 
 	} else {
@@ -70,7 +95,11 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 
 		go rp.updateResourceModel(podName, podNamespace, schedulingTime)
 		dataAvailable = false
-		c <- "empty"
+		c <- ResourceProfilingValue{
+			resourceType: system.None,
+			value:        "",
+			label:        "",
+		}
 	}
 
 	if dataAvailable {
@@ -80,45 +109,81 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 		prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
 		if err != nil {
 			log.Print(err)
-			c <- "empty"
+			c <- ResourceProfilingValue{
+				resourceType: system.None,
+				value:        "",
+				label:        "",
+			}
 		}
 
 		podLabel := rp.createResourceCRD(podName, podNamespace, prediction, schedulingTime)
-		c <- podLabel
+
+		switch rp.data.(type) {
+		case *datastructure.MemoryModel:
+			c <- ResourceProfilingValue{
+				resourceType: system.Memory,
+				value:        prediction,
+				label:        podLabel,
+			}
+		case *datastructure.CPUModel:
+			c <- ResourceProfilingValue{
+				resourceType: system.CPU,
+				value:        prediction,
+				label:        podLabel,
+			}
+		default:
+			c <- ResourceProfilingValue{
+				resourceType: system.None,
+				value:        "",
+				label:        "",
+			}
+		}
 	}
 
 	return
 }
 
-func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan string) {
-	//for _, job := range jobs {
-	//	if err := rp.updateResourceModel(job); err != nil {
-	//		log.Print(err)
-	//	}
-	//}
+func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan ResourceProfilingValues, profilingTime time.Time) {
+	result := make(ResourceProfilingValues, 0, 5)
+
+	for _, job := range jobs {
+		rp.updateResourceModel(job.Name, job.Namespace, profilingTime)
+	}
 
 	if err := rp.tuneResourceModel(jobs); err != nil {
 		log.Print(err)
 	}
 
-	log.Print(rp.data.PrintModel())
-
 	for _, job := range jobs {
-		currTime := time.Now()
-
-		prediction, err := rp.data.GetJobPrediction(job.Name, job.Namespace, currTime)
+		prediction, err := rp.data.GetJobPrediction(job.Name, job.Namespace, profilingTime)
 		if err != nil {
 			log.Print(err)
-			c <- "empty"
+			c <- ResourceProfilingValues{}
 			return
 		}
 
 		rp.clientMutex.Lock()
-		_ = rp.createResourceCRD(job.Name, job.Namespace, prediction, currTime)
+		crdName := rp.createResourceCRD(job.Name, job.Namespace, prediction, profilingTime)
+		rpv := ResourceProfilingValue{
+			value: prediction,
+			label: crdName,
+			job:   job,
+		}
+
+		switch rp.data.(type) {
+		case *datastructure.MemoryModel:
+			rpv.resourceType = system.Memory
+		case *datastructure.CPUModel:
+			rpv.resourceType = system.CPU
+		default:
+			rpv.resourceType = system.None
+		}
+
+		result = append(result, rpv)
 		rp.clientMutex.Unlock()
 	}
 
-	c <- "finished"
+	c <- result
 }
 
 func (rp *ResourceProfiling) createResourceCRD(jobName string, jobNamespace string, prediction string, currTime time.Time) string {
@@ -199,11 +264,11 @@ func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace st
 	}
 
 	if err != nil {
+		log.Print(err)
 		return
 	}
 
 	rp.data.InsertJob(extractDeploymentFromPodName(jobName), jobNamespace, records, schedulingTime)
-
 	return
 }
 

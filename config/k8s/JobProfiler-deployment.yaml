@@ -20,12 +20,19 @@ spec:
           image: stegala/job-profiler
           env:
           - name: PROMETHEUS_URL
-            value: "10.98.228.243"
+            value: "10.108.190.139"
           - name: PROMETHEUS_PORT
             value: "9090"
           - name: PROFILING_NAMESPACE
             value: "default" #empty means all the namespaces
           - name: BACKGROUND_ROUTINE_UPDATE_TIME
-            value: "60"
+            value: "600"
           - name: BACKGROUND_ROUTINE_ENABLED
-            value: "FALSE"
+            value: "TRUE"
+          - name: TIMESLOTS
+            value: "4"
+          - name: CPU_THRESHOLD
+            value: ""
+          - name: MEMORY_THRESHOLD
+            value: ""
+

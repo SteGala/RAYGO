@@ -17,7 +17,7 @@ func computePeakSignal(records []system.ResourceRecord, timeSlots int) []float64
 	}
 
 	for id, record := range records {
-		if record.PodInformation.Name != podName || id == len(records) - 1 {
+		if record.PodInformation.Name != podName || id == len(records)-1 {
 			for i := 0; i < timeSlots; i++ {
 				if peaksValues[i] > 0 {
 					resultValues[i] += peaksValues[i]
@@ -68,12 +68,12 @@ func computeKPercentile(records []system.ResourceRecord, K int, timeSlots int) [
 	for i := 0; i < timeSlots; i++ {
 		sort.Float64s(sortedRecords[i])
 	}
-	
+
 	if K == 100 {
 		result := make([]float64, timeSlots)
 
 		for i := 0; i < timeSlots; i++ {
-			result[i] = sortedRecords[i][len(sortedRecords[i]) - 1]
+			result[i] = sortedRecords[i][len(sortedRecords[i])-1]
 		}
 
 		return result

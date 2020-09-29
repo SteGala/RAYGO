@@ -122,7 +122,6 @@ func (cp *ConnectionProfiling) createConnectionCRD(jobName string, jobNamespace 
 		buffer.WriteString(crdName + "\n")
 	}
 
-
 	return buffer.String()
 }
 
@@ -145,7 +144,6 @@ func (cp *ConnectionProfiling) updateConnectionGraph(jobName string, jobNamespac
 }
 
 func (cp *ConnectionProfiling) GetJobConnections(job system.Job, time time.Time) ([]system.Job, error) {
-	//log.Print(cp.graph.PrintGraph())
 	return cp.graph.FindSCC(extractDeploymentFromPodName(job.Name), job.Namespace, time)
 }
 

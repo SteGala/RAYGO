@@ -30,7 +30,7 @@ type connections struct {
 
 func InitConnectionGraph(timeslots int) *ConnectionGraph {
 	return &ConnectionGraph{
-		jobs:      make(map[string]*connectionJob),
+		jobs:      populateFakeConnectionGraph(timeslots),
 		mutex:     sync.Mutex{},
 		timeslots: timeslots,
 	}
@@ -219,7 +219,11 @@ func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string, time tim
 	visited := make(map[string]bool, len(cg.jobs))
 
 	if job, found := cg.jobs[generateMapKey(jobName, jobNamespace)]; !found {
-		return nil, errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
+		result = append(result, system.Job{
+			Name:      jobName,
+			Namespace: jobNamespace,
+		})
+		return result, nil
 	} else {
 		cg.mutex.Lock()
 		defer cg.mutex.Unlock()
@@ -319,4 +323,120 @@ func getDifferentJobNames(records []system.ConnectionRecord) []system.Job {
 	}
 
 	return differentJobs
+}
+
+func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
+	ret := make(map[string]*connectionJob)
+	connJobs := make([][]connections, timeslots)
+
+	for i := 0; i < timeslots; i++ {
+		connJobs[i] = make([]connections, 0, 5)
+	}
+
+	con1 := connections{
+		ConnectedTo: system.Job{
+			Name:      "reviews-v2",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+	con2 := connections{
+		ConnectedTo: system.Job{
+			Name:      "reviews-v3",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+	con3 := connections{
+		ConnectedTo: system.Job{
+			Name:      "ratings-v1",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+	con4 := connections{
+		ConnectedTo: system.Job{
+			Name:      "productpage-v1",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+	con5 := connections{
+		ConnectedTo: system.Job{
+			Name:      "details-v1",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+
+	for i := 0; i < timeslots; i++ {
+		connJobs[i] = append(connJobs[i], con1)
+		connJobs[i] = append(connJobs[i], con2)
+		connJobs[i] = append(connJobs[i], con3)
+		connJobs[i] = append(connJobs[i], con4)
+		connJobs[i] = append(connJobs[i], con5)
+	}
+
+	reviews_v1_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "reviews-v1",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	reviews_v2_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "reviews-v2",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	reviews_v3_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "reviews-v3",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	ratings_v1_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "ratings-v1",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	productpage_v1_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "productpage-v1",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	details_v1_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "details-v1",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	ret[generateMapKey(reviews_v1_cj.jobInformation.Name, reviews_v1_cj.jobInformation.Namespace)] = &reviews_v1_cj
+	ret[generateMapKey(reviews_v2_cj.jobInformation.Name, reviews_v2_cj.jobInformation.Namespace)] = &reviews_v2_cj
+	ret[generateMapKey(reviews_v3_cj.jobInformation.Name, reviews_v3_cj.jobInformation.Namespace)] = &reviews_v3_cj
+	ret[generateMapKey(ratings_v1_cj.jobInformation.Name, ratings_v1_cj.jobInformation.Namespace)] = &ratings_v1_cj
+	ret[generateMapKey(productpage_v1_cj.jobInformation.Name, productpage_v1_cj.jobInformation.Namespace)] = &productpage_v1_cj
+	ret[generateMapKey(details_v1_cj.jobInformation.Name, details_v1_cj.jobInformation.Namespace)] = &details_v1_cj
+
+	return ret
 }

@@ -8,6 +8,7 @@ import (
 	"github.io/Liqo/JobProfiler/internal/system"
 	"gomodules.xyz/jsonpatch/v2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"strconv"
-	"strings"
+	"sync"
 	"time"
 	// +kubebuilder:scaffold:imports
 )
@@ -38,6 +39,7 @@ type ProfilingSystem struct {
 	prometheus                  *system.PrometheusProvider
 	client                      *kubernetesProvider
 	clientCRD                   client.Client
+	clientMutex                 sync.Mutex
 	backgroundRoutineUpdateTime int
 	backgroundRoutineEnabled    bool
 }
@@ -98,7 +100,7 @@ func (p *ProfilingSystem) printInitialInformation() {
 	log.Print("|      Job Profiler      |")
 	log.Print("--------------------------")
 
-	log.Print(" - Version: v0.1.2")
+	log.Print(" - Version: v0.1.3")
 	log.Print(" - Author: Stefano Galantino")
 	log.Println()
 }
@@ -185,8 +187,8 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 	}
 
 	connChan := make(chan string)
-	memChan := make(chan string)
-	cpuChan := make(chan string)
+	memChan := make(chan ResourceProfilingValue)
+	cpuChan := make(chan ResourceProfilingValue)
 
 	for event := range watch.ResultChan() {
 
@@ -203,7 +205,7 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 			memLabel := <-memChan
 			cpuLabel := <-cpuChan
 
-			if err := addPodLabels(p.client.client, connLabels, memLabel, cpuLabel, event.Object.(*v1.Pod)); err != nil {
+			if err := p.addPodLabels(connLabels, memLabel, cpuLabel, event.Object.(*v1.Pod)); err != nil {
 				log.Print("Cannot add labels to pod " + event.Object.(*v1.Pod).Name)
 				log.Print(err)
 			}
@@ -215,25 +217,32 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 
 // ProfilingBackgroundUpdate should be performed in a background routine
 func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
-	//connChan := make(chan string)
-	cpuChan := make(chan string)
-	memChan := make(chan string)
+	cpuChan := make(chan ResourceProfilingValues)
+	memChan := make(chan ResourceProfilingValues)
 
 	for {
 		if job, err := p.memory.data.GetLastUpdatedJob(); err == nil {
 			log.Print(" - BACKGROUND -\tpod: " + job.Name)
 
-			if jobConnections, err := p.connection.GetJobConnections(job, time.Now()); err == nil {
+			profilingTime := time.Now()
 
-				go p.cpu.UpdatePrediction(jobConnections, cpuChan)
-				go p.memory.UpdatePrediction(jobConnections, memChan)
-				//go p.connection.UpdatePrediction(jobConnections, connChan)
+			if jobConnections, err := p.connection.GetJobConnections(job, profilingTime); err == nil {
+				go p.cpu.UpdatePrediction(jobConnections, cpuChan, profilingTime)
+				go p.memory.UpdatePrediction(jobConnections, memChan, profilingTime)
 
-				//connLabels := <-connChan
-				_ = <-memChan
-				_ = <-cpuChan
+				memValues := <-memChan
+				cpuValues := <-cpuChan
+
+				if len(memValues) == len(cpuValues) {
+					for i := 0; i < len(memValues); i++ {
+						if err := p.updateDeploymentSpec(memValues[i].job, memValues[i], cpuValues[i]); err != nil {
+							log.Print(err)
+						}
+					}
+				}
+
 			} else {
-				log.Print(err)
+				log.Print("Error " + err.Error())
 			}
 		}
 
@@ -244,14 +253,16 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 	}
 }
 
-func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel string, cpuLabel string, pod *v1.Pod) error {
+func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel ResourceProfilingValue, cpuLabel ResourceProfilingValue, pod *v1.Pod) error {
 	addLabel := false
+	var podRequest = make(map[v1.ResourceName]resource.Quantity)
+	var podLimit = make(map[v1.ResourceName]resource.Quantity)
 
-	oJson, err := json.Marshal(pod)
-	if err != nil {
-		log.Fatalln(err)
-		return err
-	}
+	//oJson, err := json.Marshal(pod)
+	//if err != nil {
+	//	log.Fatalln(err)
+	//	return err
+	//}
 
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
@@ -265,56 +276,244 @@ func addPodLabels(c *kubernetes.Clientset, connectionLabels string, memoryLabel 
 	// ------------------------------------------------------------------------------
 
 	// add labels for connections
-	if connectionLabels != "empty" {
-		addLabel = true
-
-		for id, label := range strings.Split(connectionLabels, "\n") {
-			if label == "" {
-				continue
-			}
-
-			pod.Annotations["liqo.io/connectionProfile"+fmt.Sprintf("%d", id)] = label
-		}
-	}
+	//if connectionLabels != "empty" {
+	//	addLabel = true
+	//
+	//	for id, label := range strings.Split(connectionLabels, "\n") {
+	//		if label == "" {
+	//			continue
+	//		}
+	//
+	//		pod.Annotations["liqo.io/connectionProfile"+fmt.Sprintf("%d", id)] = label
+	//	}
+	//}
 
 	// add label for memory
-	if memoryLabel != "empty" {
+	if memoryLabel.resourceType != system.None {
 		addLabel = true
 
-		pod.Annotations["liqo.io/memoryProfile"] = memoryLabel
+		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
+			s /= 1000000
+
+			if s < 64 {
+				s = 64
+			}
+
+			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s-0.5*s) + "Mi")
+			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s) + "Mi")
+		}
+
+		pod.Annotations["liqo.io/memoryProfile"] = memoryLabel.label
 	}
 
 	// add label for cpu
-	if memoryLabel != "empty" {
+	if cpuLabel.resourceType != system.None {
 		addLabel = true
 
-		pod.Annotations["liqo.io/cpuProfile"] = cpuLabel
+		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
+			if s < 0.2 {
+				s = 0.2
+			}
+
+			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s-0.5*s))
+			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
+		}
+
+		pod.Annotations["liqo.io/cpuProfile"] = cpuLabel.label
 	}
+
+	//pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+	//	Limits:   podLimit,
+	//	Requests: podRequest,
+	//}
 
 	// if there is at least one label to add, the request to the API server is created
 	if addLabel {
-		mJson, err := json.Marshal(pod)
-		if err != nil {
-			log.Fatalln(err)
-			return err
-		}
+		//mJson, err := json.Marshal(pod)
+		//if err != nil {
+		//	log.Fatalln(err)
+		//	return err
+		//}
 
-		patch, err := jsonpatch.CreatePatch(oJson, mJson)
-		if err != nil {
-			log.Fatalln(err)
-			return err
-		}
+		//patch, err := jsonpatch.CreatePatch(oJson, mJson)
+		//if err != nil {
+		//	log.Fatalln(err)
+		//	return err
+		//}
 
-		pb, err := json.MarshalIndent(patch, "", "  ")
-		if err != nil {
-			log.Fatalln(err)
-			return err
-		}
+		//pb, err := json.MarshalIndent(patch, "", "  ")
+		//if err != nil {
+		//	log.Fatalln(err)
+		//	return err
+		//}
 
-		_, err = c.CoreV1().Pods(pod.Namespace).Patch(pod.Name, types.JSONPatchType, pb)
-		if err != nil {
+		p.clientMutex.Lock()
+		defer p.clientMutex.Unlock()
+
+		//// add labels to the pod
+		//if _, err = p.client.client.CoreV1().Pods(pod.Namespace).Patch(pod.Name, types.JSONPatchType, pb); err != nil {
+		//	return err
+		//}
+
+		if deploymentList, err := p.client.client.AppsV1().Deployments(pod.Namespace).List(metav1.ListOptions{}); err == nil {
+			for _, d := range deploymentList.Items {
+				//log.Print(d.Name)
+				if d.Name == extractDeploymentFromPodName(pod.Name) {
+
+					memRequest := podRequest["memory"]
+					memLimit := podLimit["memory"]
+					cpuRequest := podRequest["cpu"]
+					cpuLimit := podLimit["cpu"]
+
+					oJson, err := json.Marshal(d)
+					if err != nil {
+						log.Fatalln(err)
+						return err
+					}
+
+					if d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() > int64(float64(memRequest.Value())+0.15*float64(memRequest.Value())) ||
+						d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() < int64(float64(memRequest.Value())-0.15*float64(memRequest.Value())) ||
+						d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() > int64(float64(memLimit.Value())+0.15*float64(memLimit.Value())) ||
+						d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() < int64(float64(memLimit.Value())-0.15*float64(memLimit.Value())) ||
+						d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Value() > int64(float64(cpuRequest.Value())+0.15*float64(cpuRequest.Value())) ||
+						d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Value() < int64(float64(cpuRequest.Value())-0.15*float64(cpuRequest.Value())) ||
+						d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Value() > int64(float64(cpuLimit.Value())+0.15*float64(cpuLimit.Value())) ||
+						d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Value() < int64(float64(cpuLimit.Value())-0.15*float64(cpuLimit.Value())) {
+
+						log.Print("Scheduling -> patch " + d.Name)
+						d.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
+							Limits:   podLimit,
+							Requests: podRequest,
+						}
+
+						mJson, err := json.Marshal(d)
+						if err != nil {
+							log.Fatalln(err)
+							return err
+						}
+
+						patch, err := jsonpatch.CreatePatch(oJson, mJson)
+						if err != nil {
+							log.Fatalln(err)
+							return err
+						}
+
+						pb, err := json.MarshalIndent(patch, "", "  ")
+						if err != nil {
+							log.Fatalln(err)
+							return err
+						}
+
+						if _, err = p.client.client.AppsV1().Deployments(pod.Namespace).Patch(d.Name, types.JSONPatchType, pb); err != nil {
+							return err
+						}
+					} else {
+						break
+					}
+				}
+			}
+		} else {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel ResourceProfilingValue, cpuLabel ResourceProfilingValue) error {
+	var podRequest = make(map[v1.ResourceName]resource.Quantity)
+	var podLimit = make(map[v1.ResourceName]resource.Quantity)
+
+	// add label for memory
+	if memoryLabel.resourceType != system.None {
+		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
+			s /= 1000000
+
+			if s < 64 {
+				s = 64
+			}
+
+			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s-0.5*s) + "Mi")
+			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s) + "Mi")
+		}
+	}
+
+	// add label for cpu
+	if cpuLabel.resourceType != system.None {
+		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
+			if s < 0.5 {
+				s = 0.5
+			}
+
+			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s-0.5*s))
+			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
+		}
+	}
+
+	p.clientMutex.Lock()
+	defer p.clientMutex.Unlock()
+
+	if deploymentList, err := p.client.client.AppsV1().Deployments(job.Namespace).List(metav1.ListOptions{}); err == nil {
+		for _, d := range deploymentList.Items {
+			if d.Name == job.Name {
+
+				memRequest := podRequest["memory"]
+				memLimit := podLimit["memory"]
+				cpuRequest := podRequest["cpu"]
+				cpuLimit := podLimit["cpu"]
+
+				oJson, err := json.Marshal(d)
+				if err != nil {
+					log.Fatalln(err)
+					return err
+				}
+
+				if d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() > int64(float64(memRequest.Value())+0.15*float64(memRequest.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() < int64(float64(memRequest.Value())-0.15*float64(memRequest.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() > int64(float64(memLimit.Value())+0.15*float64(memLimit.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() < int64(float64(memLimit.Value())-0.15*float64(memLimit.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Value() > int64(float64(cpuRequest.Value())+0.15*float64(cpuRequest.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Value() < int64(float64(cpuRequest.Value())-0.15*float64(cpuRequest.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Value() > int64(float64(cpuLimit.Value())+0.15*float64(cpuLimit.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Value() < int64(float64(cpuLimit.Value())-0.15*float64(cpuLimit.Value())) {
+
+					log.Print("Background -> patch " + d.Name)
+					d.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
+						Limits:   podLimit,
+						Requests: podRequest,
+					}
+
+					mJson, err := json.Marshal(d)
+					if err != nil {
+						log.Fatalln(err)
+						return err
+					}
+
+					patch, err := jsonpatch.CreatePatch(oJson, mJson)
+					if err != nil {
+						log.Fatalln(err)
+						return err
+					}
+
+					pb, err := json.MarshalIndent(patch, "", "  ")
+					if err != nil {
+						log.Fatalln(err)
+						return err
+					}
+
+					if _, err = p.client.client.AppsV1().Deployments(job.Namespace).Patch(d.Name, types.JSONPatchType, pb); err != nil {
+						return err
+					}
+
+					break
+				} else {
+					break
+				}
+
+			}
+		}
+	} else {
+		return err
 	}
 
 	return nil
