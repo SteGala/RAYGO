@@ -183,7 +183,7 @@ func initKubernetesCRDClient() (client.Client, error) {
 // to compute the profiling on each element. Each profiling is executed in a different thread
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
-	startDate, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", "Thu, 02 Jul 2020 00:00:00 GMT")
+	startDate, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", "Tue, 15 Sep 2020 11:00:00 GMT")
 	if err != nil {
 		return err
 	}
@@ -193,26 +193,26 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 	bufCPU.WriteString("\n")
 	bufMem.WriteString("\n")
 
-	for i := 0 ; i < 8*288*5 ; i += 5 {
+	for i := 0 ; i < 14*288*5 ; i += 5 {
 
 		fmt.Println(startDate.Add(time.Minute * time.Duration(i)).String())
 
 		//go p.connection.ComputePrediction("", "", connChan, startDate.Add(time.Minute * time.Duration(i)))
-		p.memory.ComputePrediction("grafana-5dc4f8dbf-5gkvk", "monitoring", startDate.Add(time.Minute * time.Duration(i)))
-		p.cpu.ComputePrediction("grafana-5dc4f8dbf-5gkvk", "monitoring", startDate.Add(time.Minute * time.Duration(i)))
+		p.memory.ComputePrediction("virt-handler-swqgf", "kubevirt", startDate.Add(time.Minute * time.Duration(i)))
+		p.cpu.ComputePrediction("virt-handler-swqgf", "kubevirt", startDate.Add(time.Minute * time.Duration(i)))
 	}
 
 	bufCPU.WriteString("\n")
 	bufMem.WriteString("\n")
 
-	fMem, err := os.Create("./memProfiling")
+	fMem, err := os.Create("./memProfiling.dat")
 	if err != nil {
 		log.Print(err)
 		return err
 	}
 	defer fMem.Close()
 
-	fCPU, err := os.Create("./cpuProfiling")
+	fCPU, err := os.Create("./cpuProfiling.dat")
 	if err != nil {
 		log.Print(err)
 		return err

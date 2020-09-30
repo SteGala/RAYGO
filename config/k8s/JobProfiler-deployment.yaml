@@ -14,7 +14,6 @@ spec:
     metadata:
       labels:
         app: job-profiler
-    spec:
       containers:
         - name: job-profiler
           image: stegala/job-profiler

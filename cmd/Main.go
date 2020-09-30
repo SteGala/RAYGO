@@ -12,7 +12,7 @@ func main() {
 	os.Setenv("PROFILING_NAMESPACE", "")
 	os.Setenv("BACKGROUND_ROUTINE_UPDATE_TIME", "60")
 	os.Setenv("BACKGROUND_ROUTINE_ENABLED", "FALSE")
-	os.Setenv("TIMESLOTS", "4")
+	os.Setenv("TIMESLOTS", "8")
 
 	var profiling profiling.ProfilingSystem
 
