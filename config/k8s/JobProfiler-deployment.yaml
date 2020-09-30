@@ -32,7 +32,11 @@ spec:
           - name: TIMESLOTS
             value: "4"
           - name: CPU_THRESHOLD
-            value: ""
+            value: "0.5"
           - name: MEMORY_THRESHOLD
-            value: ""
+            value: "600.0"
+          - name: CPU_LOWER_THRESHOLD
+            value: "0.05"
+          - name: MEMORY_LOWER_THRESHOLD
+            value: "50.0"
 

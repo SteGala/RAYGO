@@ -12,10 +12,11 @@ import (
 )
 
 type CPUModel struct {
-	jobs                   map[string]*cpuInfo
-	mutex                  sync.Mutex
-	timeslots              int
-	cpuThrottlingThreshold float64
+	jobs                        map[string]*cpuInfo
+	mutex                       sync.Mutex
+	timeslots                   int
+	cpuThrottlingThreshold      float64
+	cpuThrottlingLowerThreshold float64
 }
 
 type cpuInfo struct {
@@ -24,12 +25,13 @@ type cpuInfo struct {
 	lastUpdate     time.Time
 }
 
-func InitCPUModel(timeslots int, threshold float64) *CPUModel {
+func InitCPUModel(timeslots int, threshold float64, lowerThreshold float64) *CPUModel {
 	return &CPUModel{
-		jobs:                   make(map[string]*cpuInfo),
-		mutex:                  sync.Mutex{},
-		timeslots:              timeslots,
-		cpuThrottlingThreshold: threshold,
+		jobs:                        make(map[string]*cpuInfo),
+		mutex:                       sync.Mutex{},
+		timeslots:                   timeslots,
+		cpuThrottlingThreshold:      threshold,
+		cpuThrottlingLowerThreshold: lowerThreshold,
 	}
 }
 
@@ -176,9 +178,6 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 				avgThrottling: avg,
 			})
 
-			//log.Print(job)
-			//log.Print(avg)
-
 			sum = 0.0
 			count = 0
 			job = record.PodInformation
@@ -199,11 +198,11 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 	}
 
 	if len(throttlingInfo) == 1 {
-		maxThreshold = cp.cpuThrottlingThreshold + cp.cpuThrottlingThreshold*0.4
-		minThreshold = cp.cpuThrottlingThreshold - cp.cpuThrottlingThreshold*0.4
+		maxThreshold = cp.cpuThrottlingThreshold + cp.cpuThrottlingThreshold*0.3
+		minThreshold = cp.cpuThrottlingThreshold - cp.cpuThrottlingThreshold*0.3
 	} else {
-		maxThreshold = avg + avg*0.4
-		minThreshold = avg - avg*0.4
+		maxThreshold = avg + avg*0.3
+		minThreshold = avg - avg*0.3
 	}
 
 	cp.mutex.Lock()
@@ -214,16 +213,20 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 
 		_, found := cp.jobs[key]
 
-		if t.avgThrottling > maxThreshold && found {
+		if t.avgThrottling > maxThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold {
 			currTime := time.Now()
+
+			//log.Print("Increasing cpu " + t.podName)
 
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 
 			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * 0.2
 		}
 
-		if t.avgThrottling < minThreshold && found {
+		if t.avgThrottling < minThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold {
 			currTime := time.Now()
+
+			//log.Print("Decreasing cpu " + t.podName)
 
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 

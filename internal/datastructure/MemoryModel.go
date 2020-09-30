@@ -12,10 +12,11 @@ import (
 )
 
 type MemoryModel struct {
-	jobs                map[string]*memoryInfo
-	mutex               sync.Mutex
-	timeslots           int
-	memoryFailThreshold float64
+	jobs                     map[string]*memoryInfo
+	mutex                    sync.Mutex
+	timeslots                int
+	memoryFailThreshold      float64
+	memoryFailLowerThreshold float64
 }
 
 type memoryInfo struct {
@@ -24,12 +25,13 @@ type memoryInfo struct {
 	lastUpdate       time.Time
 }
 
-func InitMemoryModel(timeslots int, threshold float64) *MemoryModel {
+func InitMemoryModel(timeslots int, threshold float64, lowerThreshold float64) *MemoryModel {
 	return &MemoryModel{
-		jobs:                make(map[string]*memoryInfo),
-		mutex:               sync.Mutex{},
-		timeslots:           timeslots,
-		memoryFailThreshold: threshold,
+		jobs:                     make(map[string]*memoryInfo),
+		mutex:                    sync.Mutex{},
+		timeslots:                timeslots,
+		memoryFailThreshold:      threshold,
+		memoryFailLowerThreshold: lowerThreshold,
 	}
 }
 
@@ -194,11 +196,11 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 	}
 
 	if len(memFailInfo) == 1 {
-		maxThreshold = mm.memoryFailThreshold + mm.memoryFailThreshold*0.4
-		minThreshold = mm.memoryFailThreshold - mm.memoryFailThreshold*0.4
+		maxThreshold = mm.memoryFailThreshold + mm.memoryFailThreshold*0.3
+		minThreshold = mm.memoryFailThreshold - mm.memoryFailThreshold*0.3
 	} else {
-		maxThreshold = avg + avg*0.4
-		minThreshold = avg - avg*0.4
+		maxThreshold = avg + avg*0.3
+		minThreshold = avg - avg*0.3
 	}
 
 	mm.mutex.Lock()
@@ -209,16 +211,20 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 
 		_, found := mm.jobs[key]
 
-		if t.avgFail > maxThreshold && found {
+		if t.avgFail > maxThreshold && found && t.avgFail > mm.memoryFailLowerThreshold {
 			currTime := time.Now()
+
+			//log.Print("Increasing memory " + t.podName)
 
 			id := generateTimeslotIndex(currTime, mm.timeslots)
 
 			mm.jobs[key].memoryPrediction[id] += mm.jobs[key].memoryPrediction[id] * 0.2
 		}
 
-		if t.avgFail < minThreshold && found {
+		if t.avgFail < minThreshold && found && t.avgFail > mm.memoryFailLowerThreshold {
 			currTime := time.Now()
+
+			//log.Print("Decreasing memory " + t.podName)
 
 			id := generateTimeslotIndex(currTime, mm.timeslots)
 

@@ -335,35 +335,78 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 
 	con1 := connections{
 		ConnectedTo: system.Job{
-			Name:      "reviews-v2",
+			Name:      "emailservice",
 			Namespace: "default",
 		},
 		Bandwidth: 145,
 	}
 	con2 := connections{
 		ConnectedTo: system.Job{
-			Name:      "reviews-v3",
+			Name:      "checkoutservice",
 			Namespace: "default",
 		},
 		Bandwidth: 145,
 	}
 	con3 := connections{
 		ConnectedTo: system.Job{
-			Name:      "ratings-v1",
+			Name:      "recommendationservice",
 			Namespace: "default",
 		},
 		Bandwidth: 145,
 	}
 	con4 := connections{
 		ConnectedTo: system.Job{
-			Name:      "productpage-v1",
+			Name:      "frontend",
 			Namespace: "default",
 		},
 		Bandwidth: 145,
 	}
 	con5 := connections{
 		ConnectedTo: system.Job{
-			Name:      "details-v1",
+			Name:      "paymentservice",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+
+	con6 := connections{
+		ConnectedTo: system.Job{
+			Name:      "productcatalogservice",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+	con7 := connections{
+		ConnectedTo: system.Job{
+			Name:      "cartservice",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+	con8 := connections{
+		ConnectedTo: system.Job{
+			Name:      "currencyservice",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+	con9 := connections{
+		ConnectedTo: system.Job{
+			Name:      "shippingservice",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+	con10 := connections{
+		ConnectedTo: system.Job{
+			Name:      "redis-cart",
+			Namespace: "default",
+		},
+		Bandwidth: 145,
+	}
+	con11 := connections{
+		ConnectedTo: system.Job{
+			Name:      "adservice",
 			Namespace: "default",
 		},
 		Bandwidth: 145,
@@ -375,68 +418,124 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 		connJobs[i] = append(connJobs[i], con3)
 		connJobs[i] = append(connJobs[i], con4)
 		connJobs[i] = append(connJobs[i], con5)
+		connJobs[i] = append(connJobs[i], con6)
+		connJobs[i] = append(connJobs[i], con7)
+		connJobs[i] = append(connJobs[i], con8)
+		connJobs[i] = append(connJobs[i], con9)
+		connJobs[i] = append(connJobs[i], con10)
+		connJobs[i] = append(connJobs[i], con11)
 	}
 
-	reviews_v1_cj := connectionJob{
+	emailservice_cj := connectionJob{
 		jobInformation: system.Job{
-			Name:      "reviews-v1",
+			Name:      "emailservice",
 			Namespace: "default",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
 	}
 
-	reviews_v2_cj := connectionJob{
+	checkoutservice_cj := connectionJob{
 		jobInformation: system.Job{
-			Name:      "reviews-v2",
+			Name:      "checkoutservice",
 			Namespace: "default",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
 	}
 
-	reviews_v3_cj := connectionJob{
+	recommendationservice_cj := connectionJob{
 		jobInformation: system.Job{
-			Name:      "reviews-v3",
+			Name:      "recommendationservice",
 			Namespace: "default",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
 	}
 
-	ratings_v1_cj := connectionJob{
+	frontend_cj := connectionJob{
 		jobInformation: system.Job{
-			Name:      "ratings-v1",
+			Name:      "frontend",
 			Namespace: "default",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
 	}
 
-	productpage_v1_cj := connectionJob{
+	paymentservice_cj := connectionJob{
 		jobInformation: system.Job{
-			Name:      "productpage-v1",
+			Name:      "paymentservice",
 			Namespace: "default",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
 	}
 
-	details_v1_cj := connectionJob{
+	productcatalogservice_cj := connectionJob{
 		jobInformation: system.Job{
-			Name:      "details-v1",
+			Name:      "productcatalogservice",
 			Namespace: "default",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
 	}
 
-	ret[generateMapKey(reviews_v1_cj.jobInformation.Name, reviews_v1_cj.jobInformation.Namespace)] = &reviews_v1_cj
-	ret[generateMapKey(reviews_v2_cj.jobInformation.Name, reviews_v2_cj.jobInformation.Namespace)] = &reviews_v2_cj
-	ret[generateMapKey(reviews_v3_cj.jobInformation.Name, reviews_v3_cj.jobInformation.Namespace)] = &reviews_v3_cj
-	ret[generateMapKey(ratings_v1_cj.jobInformation.Name, ratings_v1_cj.jobInformation.Namespace)] = &ratings_v1_cj
-	ret[generateMapKey(productpage_v1_cj.jobInformation.Name, productpage_v1_cj.jobInformation.Namespace)] = &productpage_v1_cj
-	ret[generateMapKey(details_v1_cj.jobInformation.Name, details_v1_cj.jobInformation.Namespace)] = &details_v1_cj
+	cartservice_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "cartservice",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	currencyservice_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "currencyservice",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	shippingservice_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "shippingservice",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	redis_cart_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "redis-cart",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	adservice_cj := connectionJob{
+		jobInformation: system.Job{
+			Name:      "adservice",
+			Namespace: "default",
+		},
+		connectedJobs: connJobs,
+		lastUpdate:    time.Now(),
+	}
+
+	ret[generateMapKey(adservice_cj.jobInformation.Name, adservice_cj.jobInformation.Namespace)] = &adservice_cj
+	ret[generateMapKey(cartservice_cj.jobInformation.Name, cartservice_cj.jobInformation.Namespace)] = &cartservice_cj
+	ret[generateMapKey(checkoutservice_cj.jobInformation.Name, checkoutservice_cj.jobInformation.Namespace)] = &checkoutservice_cj
+	ret[generateMapKey(currencyservice_cj.jobInformation.Name, currencyservice_cj.jobInformation.Namespace)] = &currencyservice_cj
+	ret[generateMapKey(emailservice_cj.jobInformation.Name, emailservice_cj.jobInformation.Namespace)] = &emailservice_cj
+	ret[generateMapKey(frontend_cj.jobInformation.Name, frontend_cj.jobInformation.Namespace)] = &frontend_cj
+	ret[generateMapKey(paymentservice_cj.jobInformation.Name, paymentservice_cj.jobInformation.Namespace)] = &paymentservice_cj
+	ret[generateMapKey(productcatalogservice_cj.jobInformation.Name, productcatalogservice_cj.jobInformation.Namespace)] = &productcatalogservice_cj
+	ret[generateMapKey(recommendationservice_cj.jobInformation.Name, recommendationservice_cj.jobInformation.Namespace)] = &recommendationservice_cj
+	ret[generateMapKey(redis_cart_cj.jobInformation.Name, redis_cart_cj.jobInformation.Namespace)] = & redis_cart_cj
+	ret[generateMapKey(shippingservice_cj.jobInformation.Name, shippingservice_cj.jobInformation.Namespace)] = &shippingservice_cj
 
 	return ret
 }

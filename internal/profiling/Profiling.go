@@ -212,6 +212,8 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 		}
 	}
 
+	time.Sleep(time.Hour * time.Duration(24))
+
 	return nil
 }
 
@@ -246,6 +248,9 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 			}
 		}
 
+		//log.Print(p.cpu.data.PrintModel())
+		//log.Print(p.memory.data.PrintModel())
+
 		currTime := time.Now()
 		t := currTime.Add(time.Second * time.Duration(p.backgroundRoutineUpdateTime)).Unix()
 
@@ -257,6 +262,10 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 	addLabel := false
 	var podRequest = make(map[v1.ResourceName]resource.Quantity)
 	var podLimit = make(map[v1.ResourceName]resource.Quantity)
+	var cpuRLow resource.Quantity
+	var cpuRUp resource.Quantity
+	var cpuLLow resource.Quantity
+	var cpuLUp resource.Quantity
 
 	//oJson, err := json.Marshal(pod)
 	//if err != nil {
@@ -307,6 +316,7 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 	}
 
 	// add label for cpu
+
 	if cpuLabel.resourceType != system.None {
 		addLabel = true
 
@@ -317,6 +327,10 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 
 			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s-0.5*s))
 			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
+			cpuRLow = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)-(s-0.5*s)*0.15))
+			cpuRUp = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)+(s-0.5*s)*0.15))
+			cpuLLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
+			cpuLUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
 		}
 
 		pod.Annotations["liqo.io/cpuProfile"] = cpuLabel.label
@@ -362,8 +376,8 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 
 					memRequest := podRequest["memory"]
 					memLimit := podLimit["memory"]
-					cpuRequest := podRequest["cpu"]
-					cpuLimit := podLimit["cpu"]
+					//cpuRequest := podRequest["cpu"]
+					//cpuLimit := podLimit["cpu"]
 
 					oJson, err := json.Marshal(d)
 					if err != nil {
@@ -375,10 +389,10 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 						d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() < int64(float64(memRequest.Value())-0.15*float64(memRequest.Value())) ||
 						d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() > int64(float64(memLimit.Value())+0.15*float64(memLimit.Value())) ||
 						d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() < int64(float64(memLimit.Value())-0.15*float64(memLimit.Value())) ||
-						d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Value() > int64(float64(cpuRequest.Value())+0.15*float64(cpuRequest.Value())) ||
-						d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Value() < int64(float64(cpuRequest.Value())-0.15*float64(cpuRequest.Value())) ||
-						d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Value() > int64(float64(cpuLimit.Value())+0.15*float64(cpuLimit.Value())) ||
-						d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Value() < int64(float64(cpuLimit.Value())-0.15*float64(cpuLimit.Value())) {
+						d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRLow) < 0 ||
+						d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRUp) > 0 ||
+						d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLLow) < 0 ||
+						d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLUp) > 0 {
 
 						log.Print("Scheduling -> patch " + d.Name)
 						d.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
@@ -423,6 +437,10 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel ResourceProfilingValue, cpuLabel ResourceProfilingValue) error {
 	var podRequest = make(map[v1.ResourceName]resource.Quantity)
 	var podLimit = make(map[v1.ResourceName]resource.Quantity)
+	var cpuRLow resource.Quantity
+	var cpuRUp resource.Quantity
+	var cpuLLow resource.Quantity
+	var cpuLUp resource.Quantity
 
 	// add label for memory
 	if memoryLabel.resourceType != system.None {
@@ -441,12 +459,16 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	// add label for cpu
 	if cpuLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
-			if s < 0.5 {
-				s = 0.5
+			if s < 0.2 {
+				s = 0.2
 			}
 
 			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s-0.5*s))
 			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
+			cpuRLow = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)-(s-0.5*s)*0.15))
+			cpuRUp = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)+(s-0.5*s)*0.15))
+			cpuLLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
+			cpuLUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
 		}
 	}
 
@@ -459,8 +481,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 
 				memRequest := podRequest["memory"]
 				memLimit := podLimit["memory"]
-				cpuRequest := podRequest["cpu"]
-				cpuLimit := podLimit["cpu"]
+				//cpuRequest := podRequest["cpu"]
+				//cpuLimit := podLimit["cpu"]
 
 				oJson, err := json.Marshal(d)
 				if err != nil {
@@ -472,12 +494,15 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 					d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() < int64(float64(memRequest.Value())-0.15*float64(memRequest.Value())) ||
 					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() > int64(float64(memLimit.Value())+0.15*float64(memLimit.Value())) ||
 					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() < int64(float64(memLimit.Value())-0.15*float64(memLimit.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Value() > int64(float64(cpuRequest.Value())+0.15*float64(cpuRequest.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Value() < int64(float64(cpuRequest.Value())-0.15*float64(cpuRequest.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Value() > int64(float64(cpuLimit.Value())+0.15*float64(cpuLimit.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Value() < int64(float64(cpuLimit.Value())-0.15*float64(cpuLimit.Value())) {
+					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRLow) < 0 ||
+					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRUp) > 0 ||
+					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLLow) < 0 ||
+					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLUp) > 0 {
 
 					log.Print("Background -> patch " + d.Name)
+					//log.Print(podLimit)
+					//log.Print(podRequest)
+
 					d.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
 						Limits:   podLimit,
 						Requests: podRequest,
@@ -507,6 +532,7 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 
 					break
 				} else {
+					log.Print("Background -> not patch " + d.Name)
 					break
 				}
 
@@ -517,4 +543,13 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	}
 
 	return nil
+}
+
+func computeQuantityBoundaries(data resource.Quantity) (resource.Quantity, resource.Quantity) {
+	str := data.String()
+	i, _ := strconv.ParseFloat(str, 64)
+	up := i + 0.15*i
+	low := i - 0.15*i
+	log.Print(i)
+	return resource.MustParse(fmt.Sprintf("%f", low)), resource.MustParse(fmt.Sprintf("%f", up))
 }
