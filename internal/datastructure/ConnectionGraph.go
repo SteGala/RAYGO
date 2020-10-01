@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
-	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -220,7 +219,7 @@ func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string, time tim
 
 	if job, found := cg.jobs[generateMapKey(jobName, jobNamespace)]; !found {
 		result = append(result, system.Job{
-			Name:      jobName,
+			Name:      jobName + "-xxxxxxxx-xxxxx",
 			Namespace: jobNamespace,
 		})
 		return result, nil
@@ -233,11 +232,10 @@ func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string, time tim
 		for name := range cg.jobs {
 			visited[name] = false
 		}
-		log.Print("")
 
 		visited[generateMapKey(job.jobInformation.Name, job.jobInformation.Namespace)] = true
 		result = append(result, system.Job{
-			Name:      job.jobInformation.Name,
+			Name:      job.jobInformation.Name + "-xxxxxxxx-xxxxx",
 			Namespace: job.jobInformation.Namespace,
 		})
 
@@ -256,7 +254,7 @@ func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string, time tim
 func DFS(cg *ConnectionGraph, connectedJob connections, visited map[string]bool, buffer *[]system.Job, slot int) error {
 	visited[generateMapKey(connectedJob.ConnectedTo.Name, connectedJob.ConnectedTo.Namespace)] = true
 	*buffer = append(*buffer, system.Job{
-		Name:      connectedJob.ConnectedTo.Name,
+		Name:      connectedJob.ConnectedTo.Name + "-xxxxxxxx-xxxxx",
 		Namespace: connectedJob.ConnectedTo.Namespace,
 	})
 	//log.Print(*buffer)
@@ -534,7 +532,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	ret[generateMapKey(paymentservice_cj.jobInformation.Name, paymentservice_cj.jobInformation.Namespace)] = &paymentservice_cj
 	ret[generateMapKey(productcatalogservice_cj.jobInformation.Name, productcatalogservice_cj.jobInformation.Namespace)] = &productcatalogservice_cj
 	ret[generateMapKey(recommendationservice_cj.jobInformation.Name, recommendationservice_cj.jobInformation.Namespace)] = &recommendationservice_cj
-	ret[generateMapKey(redis_cart_cj.jobInformation.Name, redis_cart_cj.jobInformation.Namespace)] = & redis_cart_cj
+	ret[generateMapKey(redis_cart_cj.jobInformation.Name, redis_cart_cj.jobInformation.Namespace)] = &redis_cart_cj
 	ret[generateMapKey(shippingservice_cj.jobInformation.Name, shippingservice_cj.jobInformation.Namespace)] = &shippingservice_cj
 
 	return ret

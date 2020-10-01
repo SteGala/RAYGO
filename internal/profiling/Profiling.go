@@ -304,8 +304,8 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
 			s /= 1000000
 
-			if s < 64 {
-				s = 64
+			if s < 128 {
+				s = 128
 			}
 
 			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s-0.5*s) + "Mi")
@@ -447,8 +447,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
 			s /= 1000000
 
-			if s < 64 {
-				s = 64
+			if s < 128 {
+				s = 128
 			}
 
 			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s-0.5*s) + "Mi")
