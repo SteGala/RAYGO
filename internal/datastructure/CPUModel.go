@@ -98,7 +98,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeCPUCorrectionConstant(i int) float64 {
-	decayTime := 1140
+	decayTime := 360
 
 	return math.Exp2(float64(-i / decayTime))
 }

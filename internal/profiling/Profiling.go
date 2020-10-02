@@ -183,7 +183,7 @@ func initKubernetesCRDClient() (client.Client, error) {
 // to compute the profiling on each element. Each profiling is executed in a different thread
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
-	startDate, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", "Tue, 15 Sep 2020 11:00:00 GMT")
+	startDate, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", "Tue, 11 Sep 2020 11:00:00 GMT")
 	if err != nil {
 		return err
 	}
