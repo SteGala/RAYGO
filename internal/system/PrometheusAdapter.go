@@ -230,6 +230,8 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 
 	end := schedulingTime.Unix()
 	start := schedulingTime.AddDate(0, 0, -7).Unix()
+	//start := schedulingTime.Add(time.Hour * time.Duration(-1)).Unix()
+
 
 	url := generateResourceURL(p.URLService, p.PortService, jobName, namespace, start, end, recordType)
 	resp, err := http.Get(url)
@@ -488,11 +490,12 @@ func generateResourceURL(ip string, port string, podName string, namespace strin
 	} else {
 		return "http://" + ip + ":" + port +
 			"/api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(rate%20" +
-			"(container_cpu_usage_seconds_total%7Bimage!%3D\"\"%2C%20pod%3D~\"" + podName + ".*\"%7D%5B1m%5D))" +
+			"(container_cpu_usage_seconds_total%7Bimage!%3D%22%22%2C%20pod%3D~%22" + podName + ".*%22%2C%20namespace%3D%22" + namespace + "%22%7D%5B1m%5D))" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
 			"&step=60"
 	}
+
 	// avg by (pod, namespace) (container_memory_usage_bytes{namespace="default", name!="", container!="", pod=~"details.*"})
 	// sum by (pod, namespace) (rate (container_cpu_usage_seconds_total{image!="", pod!=""}[1m]))
 }
