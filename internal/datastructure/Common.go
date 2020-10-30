@@ -2,6 +2,7 @@ package datastructure
 
 import (
 	"github.io/Liqo/JobProfiler/internal/system"
+	"math"
 	"sort"
 	"time"
 )
@@ -135,4 +136,29 @@ func generateTimeslotIndex(date time.Time, nTimeslots int) int {
 	// this return statement should never be reached. It's been added
 	// because otherwise the compiler complains
 	return -1
+}
+
+// the returned value is always >=0.3 and <1
+func computeResourceIncrease(value float64, avg float64) float64 {
+	x := value/avg
+
+	increase := 0.3 * math.Exp(x/5.0)
+
+	if increase > 1 {
+		increase = 1
+	}
+
+	return increase
+}
+
+func computeResourceDecrease(value float64, avg float64) float64 {
+	x := avg/value
+
+	decrease := 0.2 * math.Exp(x/5.0)
+
+	if decrease > 0.5 {
+		decrease = 0.5
+	}
+
+	return decrease
 }

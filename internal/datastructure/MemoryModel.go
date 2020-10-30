@@ -20,9 +20,9 @@ type MemoryModel struct {
 }
 
 type memoryInfo struct {
-	jobInformation   system.Job
-	memoryPrediction []float64
-	lastUpdate       time.Time
+	jobInformation   		system.Job
+	memoryPrediction 		[]float64
+	lastUpdate       		time.Time
 }
 
 func InitMemoryModel(timeslots int, threshold float64, lowerThreshold float64) *MemoryModel {
@@ -101,7 +101,7 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeMemoryCorrectionConstant(i int) float64 {
-	decayTime := 1140
+	decayTime := 360
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -132,7 +132,7 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 	defer mm.mutex.Unlock()
 
 	if job, found := mm.jobs[jobName+"{"+namespace+"}"]; !found {
-		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
+		return "", errors.New("The connectionJob " + jobName + " is not present in the memory datastructure")
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, mm.timeslots)
@@ -199,8 +199,8 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 		maxThreshold = mm.memoryFailThreshold + mm.memoryFailThreshold*0.3
 		minThreshold = mm.memoryFailThreshold - mm.memoryFailThreshold*0.3
 	} else {
-		maxThreshold = avg + avg*0.3
-		minThreshold = avg - avg*0.3
+		maxThreshold = avg + avg*0.25
+		minThreshold = avg - avg*0.25
 	}
 
 	mm.mutex.Lock()
@@ -214,21 +214,17 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 		if t.avgFail > maxThreshold && found && t.avgFail > mm.memoryFailLowerThreshold {
 			currTime := time.Now()
 
-			//log.Print("Increasing memory " + t.podName)
-
 			id := generateTimeslotIndex(currTime, mm.timeslots)
 
-			mm.jobs[key].memoryPrediction[id] += mm.jobs[key].memoryPrediction[id] * 0.2
+			mm.jobs[key].memoryPrediction[id] += mm.jobs[key].memoryPrediction[id] * computeResourceIncrease(t.avgFail, maxThreshold)
 		}
 
 		if t.avgFail < minThreshold && found && t.avgFail > mm.memoryFailLowerThreshold {
 			currTime := time.Now()
 
-			//log.Print("Decreasing memory " + t.podName)
-
 			id := generateTimeslotIndex(currTime, mm.timeslots)
 
-			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * 0.1
+			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * 0.2
 		}
 
 		if found {

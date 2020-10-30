@@ -15,9 +15,9 @@ import (
 )
 
 type ConnectionProfiling struct {
-	graph      *graph2.ConnectionGraph
-	prometheus *system.PrometheusProvider
-	crdClient  client.Client
+	graph      	*graph2.ConnectionGraph
+	prometheus 	*system.PrometheusProvider
+	crdClient  	client.Client
 }
 
 func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClient client.Client) {

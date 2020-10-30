@@ -20,9 +20,9 @@ type CPUModel struct {
 }
 
 type cpuInfo struct {
-	jobInformation system.Job
-	cpuPrediction  []float64
-	lastUpdate     time.Time
+	jobInformation 				system.Job
+	cpuPrediction  				[]float64
+	lastUpdate     				time.Time
 }
 
 func InitCPUModel(timeslots int, threshold float64, lowerThreshold float64) *CPUModel {
@@ -102,7 +102,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeCPUCorrectionConstant(i int) float64 {
-	decayTime := 1140
+	decayTime := 360
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -134,7 +134,7 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 	defer cp.mutex.Unlock()
 
 	if job, found := cp.jobs[jobName+"{"+namespace+"}"]; !found {
-		return "", errors.New("The connectionJob " + jobName + " is not present in the connection datastructure")
+		return "", errors.New("The connectionJob " + jobName + " is not present in the cpu datastructure")
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, cp.timeslots)
@@ -216,21 +216,17 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 		if t.avgThrottling > maxThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold {
 			currTime := time.Now()
 
-			//log.Print("Increasing cpu " + t.podName)
-
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 
-			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * 0.2
+			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * computeResourceIncrease(t.avgThrottling, maxThreshold)
 		}
 
 		if t.avgThrottling < minThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold {
 			currTime := time.Now()
 
-			//log.Print("Decreasing cpu " + t.podName)
-
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 
-			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * 0.1
+			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * 0.2
 		}
 
 		if found {

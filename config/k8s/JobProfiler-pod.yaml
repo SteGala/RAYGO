@@ -29,3 +29,5 @@ spec:
           value: "0.05"
         - name: MEMORY_LOWER_THRESHOLD
           value: "50.0"
+        - name: OPERATING_MODE
+          value: "PROFILING_SCHEDULING" #accepted values are: PROFILING, PROFILING_SCHEDULING. PROFILING is the default

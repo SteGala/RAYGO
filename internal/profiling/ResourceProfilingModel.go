@@ -15,17 +15,17 @@ import (
 )
 
 type ResourceProfiling struct {
-	data        datastructure.ResourceModel
-	prometheus  *system.PrometheusProvider
-	crdClient   client.Client
-	clientMutex sync.Mutex
+	data        	datastructure.ResourceModel
+	prometheus  	*system.PrometheusProvider
+	crdClient   	client.Client
+	clientMutex 	sync.Mutex
 }
 
 type ResourceProfilingValue struct {
-	resourceType system.ResourceType
-	job          system.Job
-	value        string
-	label        string
+	resourceType 	system.ResourceType
+	job          	system.Job
+	value        	string
+	label        	string
 }
 
 type ResourceProfilingValues []ResourceProfilingValue
@@ -167,7 +167,8 @@ func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan Resource
 	}
 
 	for _, job := range jobs {
-		prediction, err := rp.data.GetJobPrediction(job.Name, job.Namespace, profilingTime)
+
+		prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(job.Name), job.Namespace, profilingTime)
 		if err != nil {
 			log.Print(err)
 			c <- ResourceProfilingValues{}

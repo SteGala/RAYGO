@@ -11,25 +11,26 @@ import (
 )
 
 type ConnectionGraph struct {
-	jobs      map[string]*connectionJob
-	mutex     sync.Mutex
-	timeslots int
+	jobs      		map[string]*connectionJob
+	mutex     		sync.Mutex
+	timeslots 		int
 }
 
 type connectionJob struct {
-	jobInformation system.Job
-	connectedJobs  [][]connections
-	lastUpdate     time.Time
+	jobInformation 	system.Job
+	connectedJobs  	[][]connections
+	lastUpdate     	time.Time
 }
 
 type connections struct {
-	ConnectedTo system.Job
-	Bandwidth   float64
+	ConnectedTo 	system.Job
+	Bandwidth   	float64
 }
 
 func InitConnectionGraph(timeslots int) *ConnectionGraph {
 	return &ConnectionGraph{
-		jobs:      populateFakeConnectionGraph(timeslots),
+		//jobs:      populateFakeConnectionGraph(timeslots),
+		jobs:		make(map[string]*connectionJob),
 		mutex:     sync.Mutex{},
 		timeslots: timeslots,
 	}
