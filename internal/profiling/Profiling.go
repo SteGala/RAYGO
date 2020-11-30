@@ -43,12 +43,19 @@ type ProfilingSystem struct {
 	clientMutex                 sync.Mutex
 	backgroundRoutineUpdateTime int
 	backgroundRoutineEnabled    bool
-	enableDeploymentUpdate		bool
+	enableDeploymentUpdate      bool
 }
 
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+)
+
+type UpdateType int
+
+const (
+	Scheduling UpdateType = 1
+	Background UpdateType = 2
 )
 
 func init() {
@@ -103,7 +110,7 @@ func (p *ProfilingSystem) printInitialInformation() {
 	log.Print("|      Job Profiler      |")
 	log.Print("--------------------------")
 
-	log.Print(" - Version: v0.1.3")
+	log.Print(" - Version: v0.1.4")
 	log.Print(" - Author: Stefano Galantino")
 	log.Println()
 }
@@ -218,9 +225,9 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 
 			if p.enableDeploymentUpdate == true {
 				if err := p.updateDeploymentSpec(system.Job{
-					Name:      extractDeploymentFromPodName(pod.Name),
+					Name:      pod.Name,
 					Namespace: pod.Namespace,
-				}, memLabel, cpuLabel); err != nil {
+				}, memLabel, cpuLabel, Scheduling); err != nil {
 					log.Print(err)
 				}
 			} else {
@@ -249,6 +256,7 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 			profilingTime := time.Now()
 
 			if jobConnections, err := p.connection.GetJobConnections(job, profilingTime); err == nil {
+				//log.Print(jobConnections)
 				go p.cpu.UpdatePrediction(jobConnections, cpuChan, profilingTime)
 				go p.memory.UpdatePrediction(jobConnections, memChan, profilingTime)
 
@@ -257,7 +265,7 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 
 				if len(memValues) == len(cpuValues) {
 					for i := 0; i < len(memValues); i++ {
-						if err := p.updateDeploymentSpec(memValues[i].job, memValues[i], cpuValues[i]); err != nil {
+						if err := p.updateDeploymentSpec(memValues[i].job, memValues[i], cpuValues[i], Background); err != nil {
 							log.Print(err)
 						}
 					}
@@ -354,7 +362,7 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 	return nil
 }
 
-func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel ResourceProfilingValue, cpuLabel ResourceProfilingValue) error {
+func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel ResourceProfilingValue, cpuLabel ResourceProfilingValue, update UpdateType) error {
 	var podRequest = make(map[v1.ResourceName]resource.Quantity)
 	var podLimit = make(map[v1.ResourceName]resource.Quantity)
 	var cpuRLow resource.Quantity
@@ -419,7 +427,11 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLLow) < 0 ||
 					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLUp) > 0 {
 
-					log.Print("Background -> patch " + d.Name)
+					if update == Scheduling {
+						log.Print("Scheduling -> patch " + d.Name)
+					} else if update == Background {
+						log.Print("Background -> patch " + d.Name)
+					}
 					//log.Print(podLimit)
 					//log.Print(podRequest)
 
@@ -452,7 +464,11 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 
 					break
 				} else {
-					log.Print("Background -> not patch " + d.Name)
+					if update == Scheduling {
+						log.Print("Scheduling -> not patch " + d.Name)
+					} else if update == Background {
+						log.Print("Background -> not patch " + d.Name)
+					}
 					break
 				}
 

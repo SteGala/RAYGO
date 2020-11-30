@@ -20,9 +20,9 @@ type CPUModel struct {
 }
 
 type cpuInfo struct {
-	jobInformation 				system.Job
-	cpuPrediction  				[]float64
-	lastUpdate     				time.Time
+	jobInformation system.Job
+	cpuPrediction  []float64
+	lastUpdate     time.Time
 }
 
 func InitCPUModel(timeslots int, threshold float64, lowerThreshold float64) *CPUModel {

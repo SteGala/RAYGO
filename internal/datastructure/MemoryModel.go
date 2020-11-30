@@ -20,9 +20,9 @@ type MemoryModel struct {
 }
 
 type memoryInfo struct {
-	jobInformation   		system.Job
-	memoryPrediction 		[]float64
-	lastUpdate       		time.Time
+	jobInformation   system.Job
+	memoryPrediction []float64
+	lastUpdate       time.Time
 }
 
 func InitMemoryModel(timeslots int, threshold float64, lowerThreshold float64) *MemoryModel {

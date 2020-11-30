@@ -15,17 +15,17 @@ import (
 )
 
 type ResourceProfiling struct {
-	data        	datastructure.ResourceModel
-	prometheus  	*system.PrometheusProvider
-	crdClient   	client.Client
-	clientMutex 	sync.Mutex
+	data        datastructure.ResourceModel
+	prometheus  *system.PrometheusProvider
+	crdClient   client.Client
+	clientMutex sync.Mutex
 }
 
 type ResourceProfilingValue struct {
-	resourceType 	system.ResourceType
-	job          	system.Job
-	value        	string
-	label        	string
+	resourceType system.ResourceType
+	job          system.Job
+	value        string
+	label        string
 }
 
 type ResourceProfilingValues []ResourceProfilingValue

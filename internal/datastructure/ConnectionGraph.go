@@ -5,32 +5,33 @@ import (
 	"errors"
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
+	"log"
 	"strconv"
 	"sync"
 	"time"
 )
 
 type ConnectionGraph struct {
-	jobs      		map[string]*connectionJob
-	mutex     		sync.Mutex
-	timeslots 		int
+	jobs      map[string]*connectionJob
+	mutex     sync.Mutex
+	timeslots int
 }
 
 type connectionJob struct {
-	jobInformation 	system.Job
-	connectedJobs  	[][]connections
-	lastUpdate     	time.Time
+	jobInformation system.Job
+	connectedJobs  [][]connections
+	lastUpdate     time.Time
 }
 
 type connections struct {
-	ConnectedTo 	system.Job
-	Bandwidth   	float64
+	ConnectedTo system.Job
+	Bandwidth   float64
 }
 
 func InitConnectionGraph(timeslots int) *ConnectionGraph {
 	return &ConnectionGraph{
-		//jobs:      populateFakeConnectionGraph(timeslots),
-		jobs:		make(map[string]*connectionJob),
+		jobs: populateFakeConnectionGraph(timeslots),
+		//jobs:      make(map[string]*connectionJob),
 		mutex:     sync.Mutex{},
 		timeslots: timeslots,
 	}
@@ -223,6 +224,8 @@ func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string, time tim
 			Name:      jobName + "-xxxxxxxx-xxxxx",
 			Namespace: jobNamespace,
 		})
+		log.Print(cg.jobs)
+		log.Print(generateMapKey(jobName, jobNamespace))
 		return result, nil
 	} else {
 		cg.mutex.Lock()
@@ -335,35 +338,35 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	con1 := connections{
 		ConnectedTo: system.Job{
 			Name:      "emailservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
 	con2 := connections{
 		ConnectedTo: system.Job{
 			Name:      "checkoutservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
 	con3 := connections{
 		ConnectedTo: system.Job{
 			Name:      "recommendationservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
 	con4 := connections{
 		ConnectedTo: system.Job{
 			Name:      "frontend",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
 	con5 := connections{
 		ConnectedTo: system.Job{
 			Name:      "paymentservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
@@ -371,42 +374,42 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	con6 := connections{
 		ConnectedTo: system.Job{
 			Name:      "productcatalogservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
 	con7 := connections{
 		ConnectedTo: system.Job{
 			Name:      "cartservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
 	con8 := connections{
 		ConnectedTo: system.Job{
 			Name:      "currencyservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
 	con9 := connections{
 		ConnectedTo: system.Job{
 			Name:      "shippingservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
 	con10 := connections{
 		ConnectedTo: system.Job{
 			Name:      "redis-cart",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
 	con11 := connections{
 		ConnectedTo: system.Job{
 			Name:      "adservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		Bandwidth: 145,
 	}
@@ -428,7 +431,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	emailservice_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "emailservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -437,7 +440,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	checkoutservice_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "checkoutservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -446,7 +449,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	recommendationservice_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "recommendationservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -455,7 +458,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	frontend_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "frontend",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -464,7 +467,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	paymentservice_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "paymentservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -473,7 +476,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	productcatalogservice_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "productcatalogservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -482,7 +485,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	cartservice_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "cartservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -491,7 +494,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	currencyservice_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "currencyservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -500,7 +503,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	shippingservice_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "shippingservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -509,7 +512,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	redis_cart_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "redis-cart",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
@@ -518,7 +521,7 @@ func populateFakeConnectionGraph(timeslots int) map[string]*connectionJob {
 	adservice_cj := connectionJob{
 		jobInformation: system.Job{
 			Name:      "adservice",
-			Namespace: "default",
+			Namespace: "test-stefano",
 		},
 		connectedJobs: connJobs,
 		lastUpdate:    time.Now(),
