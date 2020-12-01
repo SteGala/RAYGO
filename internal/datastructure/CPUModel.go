@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/Liqo/JobProfiler/internal/system"
 	"math"
 	"strings"
 	"sync"
 	"time"
+
+	"github.io/Liqo/JobProfiler/internal/system"
 )
 
 type CPUModel struct {
@@ -101,8 +102,8 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 	}
 }
 
-func computeCPUCorrectionConstant(i int) float64 {
-	decayTime := 360
+func computeCPUCorrectionConstant(i int, timeslots int) float64 {
+	decayTime := 1440 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -124,7 +125,7 @@ func computeCPUWeightedSignal(records []system.ResourceRecord, timeSlots int) {
 
 		id := generateTimeslotIndex(records[i].Date, timeSlots)
 
-		records[i].Value *= computeCPUCorrectionConstant(numRecords[id])
+		records[i].Value *= computeCPUCorrectionConstant(numRecords[id], timeSlots)
 		numRecords[id]++
 	}
 }
@@ -195,14 +196,16 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 
 	if len(throttlingInfo) > 0 {
 		avg = avg / float64(len(throttlingInfo))
+	} else {
+		return
 	}
 
 	if len(throttlingInfo) == 1 {
-		maxThreshold = cp.cpuThrottlingThreshold + cp.cpuThrottlingThreshold*0.3
-		minThreshold = cp.cpuThrottlingThreshold - cp.cpuThrottlingThreshold*0.3
+		maxThreshold = cp.cpuThrottlingThreshold + cp.cpuThrottlingThreshold*0.25
+		minThreshold = cp.cpuThrottlingThreshold - cp.cpuThrottlingThreshold*0.25
 	} else {
-		maxThreshold = avg + avg*0.3
-		minThreshold = avg - avg*0.3
+		maxThreshold = avg + avg*0.25
+		minThreshold = avg - avg*0.25
 	}
 
 	cp.mutex.Lock()

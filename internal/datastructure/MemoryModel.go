@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/Liqo/JobProfiler/internal/system"
 	"math"
 	"strings"
 	"sync"
 	"time"
+
+	"github.io/Liqo/JobProfiler/internal/system"
 )
 
 type MemoryModel struct {
@@ -100,8 +101,8 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 	}
 }
 
-func computeMemoryCorrectionConstant(i int) float64 {
-	decayTime := 360
+func computeMemoryCorrectionConstant(i int, timeslots int) float64 {
+	decayTime := 1440 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -122,7 +123,7 @@ func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int)
 		}
 
 		id := generateTimeslotIndex(records[i].Date, timeSlots)
-		records[i].Value *= computeMemoryCorrectionConstant(numRecords[id])
+		records[i].Value *= computeMemoryCorrectionConstant(numRecords[id], timeSlots)
 		numRecords[id]++
 	}
 }
@@ -193,11 +194,13 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 
 	if len(memFailInfo) > 0 {
 		avg = avg / float64(len(memFailInfo))
+	} else {
+		return
 	}
 
 	if len(memFailInfo) == 1 {
-		maxThreshold = mm.memoryFailThreshold + mm.memoryFailThreshold*0.3
-		minThreshold = mm.memoryFailThreshold - mm.memoryFailThreshold*0.3
+		maxThreshold = mm.memoryFailThreshold + mm.memoryFailThreshold*0.25
+		minThreshold = mm.memoryFailThreshold - mm.memoryFailThreshold*0.25
 	} else {
 		maxThreshold = avg + avg*0.25
 		minThreshold = avg - avg*0.25

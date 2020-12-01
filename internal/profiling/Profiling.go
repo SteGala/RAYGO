@@ -3,6 +3,13 @@ package profiling
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	webappv1 "github.io/Liqo/JobProfiler/api/v1"
 	"github.io/Liqo/JobProfiler/internal/system"
@@ -15,15 +22,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"log"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -136,59 +137,6 @@ func (p *ProfilingSystem) readEnvironmentVariables() {
 	} else {
 		p.enableDeploymentUpdate = false
 	}
-}
-
-// This function:
-//  - checks if there is an available instance of Prometheus
-//  - checks if it's possible to create a Kubernetes client
-func runPreFlightCheck() (*system.PrometheusProvider, *kubernetesProvider, error) {
-
-	var prometheus system.PrometheusProvider
-	var kubernetes *kubernetesProvider
-	var err error
-
-	err = prometheus.InitPrometheusSystem()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	log.Print("[CHECKED] Connection to Prometheus established")
-
-	kubernetes, err = initKubernetesClient()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	log.Print("[CHECKED] Integration with Kubernetes established")
-
-	return &prometheus, kubernetes, nil
-}
-
-func initKubernetesClient() (*kubernetesProvider, error) {
-	//Set to in-cluster config.
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, errors.Wrap(err, "error building in cluster config")
-	}
-
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	provider := kubernetesProvider{
-		client:    client,
-		config:    config,
-		startTime: time.Now(),
-	}
-
-	return &provider, nil
-}
-
-func initKubernetesCRDClient() (client.Client, error) {
-	return client.New(config.GetConfigOrDie(), client.Options{
-		Scheme: scheme,
-	})
 }
 
 // StartProfiling starts the profiling system. It watches for pod creations and triggers:
@@ -479,4 +427,57 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	}
 
 	return nil
+}
+
+// This function:
+//  - checks if there is an available instance of Prometheus
+//  - checks if it's possible to create a Kubernetes client
+func runPreFlightCheck() (*system.PrometheusProvider, *kubernetesProvider, error) {
+
+	var prometheus system.PrometheusProvider
+	var kubernetes *kubernetesProvider
+	var err error
+
+	err = prometheus.InitPrometheusSystem()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	log.Print("[CHECKED] Connection to Prometheus established")
+
+	kubernetes, err = initKubernetesClient()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	log.Print("[CHECKED] Integration with Kubernetes established")
+
+	return &prometheus, kubernetes, nil
+}
+
+func initKubernetesClient() (*kubernetesProvider, error) {
+	//Set to in-cluster config.
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "error building in cluster config")
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	provider := kubernetesProvider{
+		client:    client,
+		config:    config,
+		startTime: time.Now(),
+	}
+
+	return &provider, nil
+}
+
+func initKubernetesCRDClient() (client.Client, error) {
+	return client.New(config.GetConfigOrDie(), client.Options{
+		Scheme: scheme,
+	})
 }
