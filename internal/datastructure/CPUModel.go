@@ -55,7 +55,11 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 	//peak := computePeakSignal(records, cp.timeslots)
 	percentile := computeKPercentile(records, 98, cp.timeslots)
 
-	job.cpuPrediction = percentile
+	if len(records) > 10 {
+		job.cpuPrediction = percentile
+	} else {
+		job.cpuPrediction = nil
+	}
 
 	cp.jobs[jobName+"{"+namespace+"}"] = &job
 }
@@ -136,6 +140,8 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 
 	if job, found := cp.jobs[jobName+"{"+namespace+"}"]; !found {
 		return "", errors.New("The connectionJob " + jobName + " is not present in the cpu datastructure")
+	} else if job.cpuPrediction == nil {
+		return "", errors.New("Not enough informations in the cpu model")
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, cp.timeslots)

@@ -54,7 +54,11 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 
 	peak := computeKPercentile(records, 100, mm.timeslots)
 
-	job.memoryPrediction = peak
+	if len(records) > 10 {
+		job.memoryPrediction = peak
+	} else {
+		job.memoryPrediction = nil
+	}
 
 	mm.jobs[jobName+"{"+namespace+"}"] = &job
 }
@@ -134,6 +138,8 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 
 	if job, found := mm.jobs[jobName+"{"+namespace+"}"]; !found {
 		return "", errors.New("The connectionJob " + jobName + " is not present in the memory datastructure")
+	} else if job.memoryPrediction == nil {
+		return "", errors.New("Not enough informations in the memory model")
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, mm.timeslots)
