@@ -330,6 +330,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s-0.5*s) + "Mi")
 			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s) + "Mi")
 		}
+	} else {
+		return errors.New("No data available for memory")
 	}
 
 	// add label for cpu
@@ -346,6 +348,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			cpuLLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
 			cpuLUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
 		}
+	} else {
+		return errors.New("No data available for cpu")
 	}
 
 	p.clientMutex.Lock()
