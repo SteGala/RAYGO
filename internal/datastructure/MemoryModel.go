@@ -54,7 +54,7 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 
 	peak := computeKPercentile(records, 100, mm.timeslots)
 
-	if len(records) > 10 {
+	if len(records) > 20 {
 		job.memoryPrediction = peak
 	} else {
 		job.memoryPrediction = nil

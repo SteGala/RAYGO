@@ -2,16 +2,17 @@ package profiling
 
 import (
 	"context"
+	"log"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+
 	v1 "github.io/Liqo/JobProfiler/api/v1"
 	"github.io/Liqo/JobProfiler/internal/datastructure"
 	"github.io/Liqo/JobProfiler/internal/system"
 	"k8s.io/apimachinery/pkg/runtime"
-	"log"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"sync"
-	"time"
 )
 
 type ResourceProfiling struct {
@@ -126,6 +127,7 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 				value:        "",
 				label:        "",
 			}
+			return
 		}
 
 		podLabel := rp.createResourceCRD(podName, podNamespace, prediction, schedulingTime)
