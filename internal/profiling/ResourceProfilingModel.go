@@ -184,15 +184,15 @@ func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan Resource
 			rpv.value = prediction
 			rpv.label = crdName
 			rpv.job = job
-		}
 
-		switch rp.data.(type) {
-		case *datastructure.MemoryModel:
-			rpv.resourceType = system.Memory
-		case *datastructure.CPUModel:
-			rpv.resourceType = system.CPU
-		default:
-			rpv.resourceType = system.None
+			switch rp.data.(type) {
+			case *datastructure.MemoryModel:
+				rpv.resourceType = system.Memory
+			case *datastructure.CPUModel:
+				rpv.resourceType = system.CPU
+			default:
+				rpv.resourceType = system.None
+			}
 		}
 
 		result = append(result, rpv)
