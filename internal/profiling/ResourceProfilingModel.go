@@ -169,20 +169,21 @@ func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan Resource
 	}
 
 	for _, job := range jobs {
+		rpv := ResourceProfilingValue{}
+
+		rp.clientMutex.Lock()
 
 		prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(job.Name), job.Namespace, profilingTime)
 		if err != nil {
-			log.Print(err)
-			c <- ResourceProfilingValues{}
-			return
-		}
+			rpv.value = ""
+			rpv.label = ""
+			rpv.resourceType = system.None
+		} else {
+			crdName := rp.createResourceCRD(job.Name, job.Namespace, prediction, profilingTime)
 
-		rp.clientMutex.Lock()
-		crdName := rp.createResourceCRD(job.Name, job.Namespace, prediction, profilingTime)
-		rpv := ResourceProfilingValue{
-			value: prediction,
-			label: crdName,
-			job:   job,
+			rpv.value = prediction
+			rpv.label = crdName
+			rpv.job = job
 		}
 
 		switch rp.data.(type) {
