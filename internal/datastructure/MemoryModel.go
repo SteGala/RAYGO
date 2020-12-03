@@ -220,7 +220,7 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 
 		_, found := mm.jobs[key]
 
-		if t.avgFail > maxThreshold && found && t.avgFail > mm.memoryFailLowerThreshold {
+		if t.avgFail > maxThreshold && found && t.avgFail > mm.memoryFailLowerThreshold && mm.jobs[key].memoryPrediction != nil {
 			currTime := time.Now()
 
 			id := generateTimeslotIndex(currTime, mm.timeslots)
@@ -228,7 +228,7 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 			mm.jobs[key].memoryPrediction[id] += mm.jobs[key].memoryPrediction[id] * computeResourceIncrease(t.avgFail, maxThreshold)
 		}
 
-		if t.avgFail < minThreshold && found && t.avgFail > mm.memoryFailLowerThreshold {
+		if t.avgFail < minThreshold && found && t.avgFail > mm.memoryFailLowerThreshold && mm.jobs[key].memoryPrediction != nil {
 			currTime := time.Now()
 
 			id := generateTimeslotIndex(currTime, mm.timeslots)

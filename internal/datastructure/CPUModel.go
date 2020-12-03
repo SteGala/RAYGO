@@ -222,7 +222,7 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 
 		_, found := cp.jobs[key]
 
-		if t.avgThrottling > maxThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold {
+		if t.avgThrottling > maxThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
 			currTime := time.Now()
 
 			id := generateTimeslotIndex(currTime, cp.timeslots)
@@ -230,7 +230,7 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * computeResourceIncrease(t.avgThrottling, maxThreshold)
 		}
 
-		if t.avgThrottling < minThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold {
+		if t.avgThrottling < minThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
 			currTime := time.Now()
 
 			id := generateTimeslotIndex(currTime, cp.timeslots)
