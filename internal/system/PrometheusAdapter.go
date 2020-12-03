@@ -482,9 +482,8 @@ func generateResourceURL(ip string, port string, podName string, namespace strin
 
 	if recordType == Memory {
 		return "http://" + ip + ":" + port +
-			"/api/v1/query_range?query=avg%20by%20(pod%2C%20namespace)%20(container_memory_usage_bytes%7Bnamespace%3D%22" + namespace +
-			"%22%2C%20name!%3D%22%22%2C%20" +
-			"container!%3D%22%22%2C%20" +
+			"/api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(container_memory_usage_bytes%7Bnamespace%3D%22" + namespace +
+			"%22%2C%20container!%3D%22POD%22%2C%20container!%3D%22%22%2C%20" +
 			"pod%3D~%22" + podName + ".*%22%7D)" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
@@ -497,7 +496,7 @@ func generateResourceURL(ip string, port string, podName string, namespace strin
 			"&end=" + strconv.Itoa(int(end)) +
 			"&step=60"
 	}
-	// avg by (pod, namespace) (container_memory_usage_bytes{namespace="default", name!="", container!="", pod=~"details.*"})
+	// sum by (pod, namespace) (container_memory_usage_bytes{namespace="default", container!="POD", container!="", pod=~"ad.*"})
 	// sum by (pod, namespace) (rate (container_cpu_usage_seconds_total{image!="", pod!=""}[1m]))
 }
 
