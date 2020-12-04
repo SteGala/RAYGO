@@ -143,7 +143,7 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, mm.timeslots)
-		prediction := job.memoryPrediction[id] + job.memoryPrediction[id]*0.4
+		prediction := job.memoryPrediction[id] + job.memoryPrediction[id]*0.5
 		return fmt.Sprintf("%.0f", prediction), nil
 	}
 }
@@ -233,7 +233,7 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 
 			id := generateTimeslotIndex(currTime, mm.timeslots)
 
-			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * 0.2
+			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * 0.15
 		}
 
 		if found {

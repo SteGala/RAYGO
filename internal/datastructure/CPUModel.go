@@ -145,7 +145,7 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, cp.timeslots)
-		prediction := job.cpuPrediction[id] + job.cpuPrediction[id]*0.4
+		prediction := job.cpuPrediction[id] + job.cpuPrediction[id]*0.5
 		return fmt.Sprintf("%.3f", prediction), nil
 	}
 }
@@ -235,7 +235,7 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 
-			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * 0.2
+			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * 0.15
 		}
 
 		if found {
