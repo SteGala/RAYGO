@@ -106,7 +106,7 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeMemoryCorrectionConstant(i int, timeslots int) float64 {
-	decayTime := 1440 / timeslots
+	decayTime := 720 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -143,7 +143,7 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, mm.timeslots)
-		prediction := job.memoryPrediction[id] + job.memoryPrediction[id]*0.3
+		prediction := job.memoryPrediction[id] + job.memoryPrediction[id]*0.2
 		return fmt.Sprintf("%.0f", prediction), nil
 	}
 }

@@ -107,7 +107,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeCPUCorrectionConstant(i int, timeslots int) float64 {
-	decayTime := 1440 / timeslots
+	decayTime := 720 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -145,7 +145,7 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, cp.timeslots)
-		prediction := job.cpuPrediction[id] + job.cpuPrediction[id]*0.3
+		prediction := job.cpuPrediction[id] + job.cpuPrediction[id]*0.2
 		return fmt.Sprintf("%.3f", prediction), nil
 	}
 }
