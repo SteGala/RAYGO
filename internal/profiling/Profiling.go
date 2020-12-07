@@ -323,12 +323,12 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
 			s /= 1000000
 
-			if s < 100 {
-				s = 100
+			if s < 50 {
+				s = 50
 			}
 
-			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s-0.5*s) + "Mi")
-			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s) + "Mi")
+			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s) + "Mi")
+			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 2*s) + "Mi")
 		}
 	} else {
 		return errors.New("No data available for memory")
@@ -337,16 +337,16 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	// add label for cpu
 	if cpuLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
-			if s < 0.1 {
-				s = 0.1
+			if s < 0.05 {
+				s = 0.05
 			}
 
-			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s-0.5*s))
-			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
-			cpuRLow = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)-(s-0.5*s)*0.15))
-			cpuRUp = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)+(s-0.5*s)*0.15))
-			cpuLLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
-			cpuLUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
+			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
+			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", 2*s))
+			cpuRLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
+			cpuRUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
+			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 2*s-2*s*0.15))
+			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 2*s+2*s*0.15))
 		}
 	} else {
 		return errors.New("No data available for cpu")

@@ -145,7 +145,8 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, cp.timeslots)
-		prediction := job.cpuPrediction[id] + job.cpuPrediction[id]*0.2
+		//prediction := job.cpuPrediction[id] + job.cpuPrediction[id]*0.2
+		prediction := job.cpuPrediction[id]
 		return fmt.Sprintf("%.3f", prediction), nil
 	}
 }

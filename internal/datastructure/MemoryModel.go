@@ -143,7 +143,8 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 	} else {
 
 		id := generateTimeslotIndex(predictionTime, mm.timeslots)
-		prediction := job.memoryPrediction[id] + job.memoryPrediction[id]*0.2
+		//prediction := job.memoryPrediction[id] + job.memoryPrediction[id]*0.2
+		prediction := job.memoryPrediction[id]
 		return fmt.Sprintf("%.0f", prediction), nil
 	}
 }
