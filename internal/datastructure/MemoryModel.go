@@ -233,7 +233,7 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 
 			id := generateTimeslotIndex(currTime, mm.timeslots)
 
-			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * 0.15
+			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * 0.25
 		}
 
 		if found {

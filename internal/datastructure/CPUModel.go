@@ -235,7 +235,7 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 
-			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * 0.15
+			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * 0.25
 		}
 
 		if found {

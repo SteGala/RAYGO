@@ -343,10 +343,10 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 
 			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s-0.5*s))
 			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
-			cpuRLow = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)-(s-0.5*s)*0.2))
-			cpuRUp = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)+(s-0.5*s)*0.2))
-			cpuLLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.2))
-			cpuLUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.2))
+			cpuRLow = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)-(s-0.5*s)*0.15))
+			cpuRUp = resource.MustParse(fmt.Sprintf("%f", (s-0.5*s)+(s-0.5*s)*0.15))
+			cpuLLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
+			cpuLUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
 		}
 	} else {
 		return errors.New("No data available for cpu")
@@ -370,10 +370,10 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 					return err
 				}
 
-				if d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() > int64(float64(memRequest.Value())+0.2*float64(memRequest.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() < int64(float64(memRequest.Value())-0.2*float64(memRequest.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() > int64(float64(memLimit.Value())+0.2*float64(memLimit.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() < int64(float64(memLimit.Value())-0.2*float64(memLimit.Value())) ||
+				if d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() > int64(float64(memRequest.Value())+0.15*float64(memRequest.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() < int64(float64(memRequest.Value())-0.15*float64(memRequest.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() > int64(float64(memLimit.Value())+0.15*float64(memLimit.Value())) ||
+					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() < int64(float64(memLimit.Value())-0.15*float64(memLimit.Value())) ||
 					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRLow) < 0 ||
 					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRUp) > 0 ||
 					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLLow) < 0 ||
@@ -413,6 +413,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 					if _, err = p.client.client.AppsV1().Deployments(job.Namespace).Patch(d.Name, types.JSONPatchType, pb); err != nil {
 						return err
 					}
+
+					//time.Sleep(1*time.Second)
 
 					break
 				} else {
