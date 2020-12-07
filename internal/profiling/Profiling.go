@@ -111,7 +111,7 @@ func (p *ProfilingSystem) printInitialInformation() {
 	log.Print("|      Job Profiler      |")
 	log.Print("--------------------------")
 
-	log.Print(" - Version: v0.1.4")
+	log.Print(" - Version: v0.1.5")
 	log.Print(" - Author: Stefano Galantino")
 	log.Println()
 }
