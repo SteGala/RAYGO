@@ -323,6 +323,9 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
 			s /= 1000000
 
+			// correct memory profiling
+			s -= s*0.3
+
 			if s < 50 {
 				s = 50
 			}
@@ -339,7 +342,7 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
 
 			// correct cpu profiling
-			s -= s*0.25
+			s -= s*0.5
 
 			if s < 0.05 {
 				s = 0.05

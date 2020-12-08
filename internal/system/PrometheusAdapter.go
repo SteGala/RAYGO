@@ -490,14 +490,15 @@ func generateResourceURL(ip string, port string, podName string, namespace strin
 			"&step=60"
 	} else {
 		return "http://" + ip + ":" + port +
-			"/api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(rate%20" +
-			"(container_cpu_usage_seconds_total%7Bimage!%3D%22%22%2C%20pod%3D~%22" + podName + ".*%22%2C%20namespace%3D%22" + namespace + "%22%7D%5B1m%5D))" +
+			"/api/v1/query_range?query=sum(node_namespace_pod_container%3Acontainer_cpu_usage_seconds_total%3Asum_rate%7B" +
+			"namespace%3D%22" + namespace + "%22%2C%20pod%3D~%22" + podName + ".*%22%7D)%20by%20(pod%2C%20namespace)" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
 			"&step=60"
 	}
+
 	// sum by (pod, namespace) (container_memory_usage_bytes{namespace="default", container!="POD", container!="", pod=~"ad.*"})
-	// sum by (pod, namespace) (rate (container_cpu_usage_seconds_total{image!="", pod!=""}[1m]))
+	// sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate{namespace="test-stefano", pod=~"frontend.*"}) by (pod)
 }
 
 func extractDeploymentFromPodName(podName string) string {
