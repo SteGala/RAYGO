@@ -1,8 +1,10 @@
 package profiling
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"log"
 	"os"
 	"strconv"
@@ -11,21 +13,16 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	webappv1 "github.io/Liqo/JobProfiler/api/v1"
 	"github.io/Liqo/JobProfiler/internal/system"
 	"gomodules.xyz/jsonpatch/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	// +kubebuilder:scaffold:imports
 )
 
 type kubernetesProvider struct {
@@ -47,24 +44,12 @@ type ProfilingSystem struct {
 	enableDeploymentUpdate      bool
 }
 
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
-)
-
 type UpdateType int
 
 const (
 	Scheduling UpdateType = 1
 	Background UpdateType = 2
 )
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-
-	_ = webappv1.AddToScheme(scheme)
-	// +kubebuilder:scaffold:scheme
-}
 
 // Initialize the profiling system. Returns error if something unexpected happens in the init process.
 func (p *ProfilingSystem) Init() error {
@@ -85,19 +70,11 @@ func (p *ProfilingSystem) Init() error {
 	}
 	log.Print("[CHECKED] ClientCRD created")
 
-	p.connection.Init(p.prometheus, p.clientCRD)
-	log.Print("[CHECKED] Connection graph initialized")
-
-	p.memory.Init(p.prometheus, p.clientCRD, system.Memory)
+	p.memory.Init(p.prometheus, system.Memory)
 	log.Print("[CHECKED] Memory model initialized")
 
-	p.cpu.Init(p.prometheus, p.clientCRD, system.CPU)
+	p.cpu.Init(p.prometheus, system.CPU)
 	log.Print("[CHECKED] CPU model initialized")
-
-	if p.backgroundRoutineEnabled {
-		go p.ProfilingBackgroundUpdate()
-		log.Print("[CHECKED] Background update routine created")
-	}
 
 	log.Print("Profiling setup completed")
 	log.Print("")
@@ -146,12 +123,15 @@ func (p *ProfilingSystem) readEnvironmentVariables() {
 // to compute the profiling on each element. Each profiling is executed in a different thread
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
-	watch, err := p.client.client.CoreV1().Pods(namespace).Watch( /*context.TODO(), */ metav1.ListOptions{})
+	list := runtime.Object()
+
+	p.clientCRD.List(context.TODO(), list, metav1.ListOptions{})
+
+	/*watch, err := p.client.client.CoreV1().Pods(namespace).Watch(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
-	connChan := make(chan string)
 	memChan := make(chan ResourceProfilingValue)
 	cpuChan := make(chan ResourceProfilingValue)
 
@@ -163,72 +143,21 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 
 			schedulingTime := time.Now()
 
-			go p.connection.ComputePrediction(pod.Name, pod.Namespace, connChan, schedulingTime)
 			go p.memory.ComputePrediction(pod.Name, pod.Namespace, memChan, schedulingTime)
 			go p.cpu.ComputePrediction(pod.Name, pod.Namespace, cpuChan, schedulingTime)
 
-			connLabels := <-connChan
 			memLabel := <-memChan
 			cpuLabel := <-cpuChan
 
-			if p.enableDeploymentUpdate == true {
-				if err := p.updateDeploymentSpec(system.Job{
-					Name:      pod.Name,
-					Namespace: pod.Namespace,
-				}, memLabel, cpuLabel, Scheduling); err != nil {
-					log.Print(err)
-				}
-			} else {
-				if err := p.addPodLabels(connLabels, memLabel, cpuLabel, pod); err != nil {
-					log.Print("Cannot add labels to pod " + pod.Name)
-					log.Print(err)
-				}
-			}
+
 		}
-	}
+	}*/
+
+
 
 	time.Sleep(time.Hour * time.Duration(24))
 
 	return nil
-}
-
-// ProfilingBackgroundUpdate should be performed in a background routine
-func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
-	cpuChan := make(chan ResourceProfilingValues)
-	memChan := make(chan ResourceProfilingValues)
-
-	for {
-		if job, err := p.memory.data.GetLastUpdatedJob(); err == nil {
-			log.Print(" - BACKGROUND -\tpod: " + job.Name)
-
-			profilingTime := time.Now()
-
-			if jobConnections, err := p.connection.GetJobConnections(job, profilingTime); err == nil {
-				//log.Print(jobConnections)
-				go p.cpu.UpdatePrediction(jobConnections, cpuChan, profilingTime)
-				go p.memory.UpdatePrediction(jobConnections, memChan, profilingTime)
-
-				memValues := <-memChan
-				cpuValues := <-cpuChan
-
-				if len(memValues) == len(cpuValues) {
-					for i := 0; i < len(memValues); i++ {
-						if err := p.updateDeploymentSpec(memValues[i].job, memValues[i], cpuValues[i], Background); err != nil {
-							log.Print(err)
-						}
-					}
-				}
-
-			} else {
-				log.Print("Error " + err.Error())
-			}
-		}
-
-		currTime := time.Now()
-		t := currTime.Add(time.Second * time.Duration(p.backgroundRoutineUpdateTime)).Unix()
-
-		time.Sleep(time.Duration(t-currTime.Unix()) * time.Second)
-	}
 }
 
 func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel ResourceProfilingValue, cpuLabel ResourceProfilingValue, pod *v1.Pod) error {
@@ -310,131 +239,6 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 	return nil
 }
 
-func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel ResourceProfilingValue, cpuLabel ResourceProfilingValue, update UpdateType) error {
-	var podRequest = make(map[v1.ResourceName]resource.Quantity)
-	var podLimit = make(map[v1.ResourceName]resource.Quantity)
-	var cpuRLow resource.Quantity
-	var cpuRUp resource.Quantity
-	var cpuLLow resource.Quantity
-	var cpuLUp resource.Quantity
-
-	// add label for memory
-	if memoryLabel.resourceType != system.None {
-		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
-			s /= 1000000
-
-			if s < 50 {
-				s = 50
-			}
-
-			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s) + "Mi")
-			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 2*s) + "Mi")
-		}
-	} else {
-		return errors.New("No data available for memory")
-	}
-
-	// add label for cpu
-	if cpuLabel.resourceType != system.None {
-		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
-
-			if s < 0.05 {
-				s = 0.05
-			}
-
-			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
-			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", 2*s))
-			cpuRLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
-			cpuRUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
-			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 2*s-2*s*0.15))
-			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 2*s+2*s*0.15))
-		}
-	} else {
-		return errors.New("No data available for cpu")
-	}
-
-	p.clientMutex.Lock()
-	defer p.clientMutex.Unlock()
-
-	if deploymentList, err := p.client.client.AppsV1().Deployments(job.Namespace).List(metav1.ListOptions{}); err == nil {
-		for _, d := range deploymentList.Items {
-			if d.Name == extractDeploymentFromPodName(job.Name) {
-
-				memRequest := podRequest["memory"]
-				memLimit := podLimit["memory"]
-				//cpuRequest := podRequest["cpu"]
-				//cpuLimit := podLimit["cpu"]
-
-				oJson, err := json.Marshal(d)
-				if err != nil {
-					log.Fatalln(err)
-					return err
-				}
-
-				if d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() > int64(float64(memRequest.Value())+0.15*float64(memRequest.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() < int64(float64(memRequest.Value())-0.15*float64(memRequest.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() > int64(float64(memLimit.Value())+0.15*float64(memLimit.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() < int64(float64(memLimit.Value())-0.15*float64(memLimit.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRLow) < 0 ||
-					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRUp) > 0 ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLLow) < 0 ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLUp) > 0 {
-
-					if update == Scheduling {
-						log.Print("Scheduling -> patch " + d.Name)
-					} else if update == Background {
-						log.Print("Background -> patch " + d.Name)
-					}
-					//log.Print(podLimit)
-					//log.Print(podRequest)
-
-					d.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
-						Limits:   podLimit,
-						Requests: podRequest,
-					}
-
-					mJson, err := json.Marshal(d)
-					if err != nil {
-						log.Fatalln(err)
-						return err
-					}
-
-					patch, err := jsonpatch.CreatePatch(oJson, mJson)
-					if err != nil {
-						log.Fatalln(err)
-						return err
-					}
-
-					pb, err := json.MarshalIndent(patch, "", "  ")
-					if err != nil {
-						log.Fatalln(err)
-						return err
-					}
-
-					if _, err = p.client.client.AppsV1().Deployments(job.Namespace).Patch(d.Name, types.JSONPatchType, pb); err != nil {
-						return err
-					}
-
-					//time.Sleep(1*time.Second)
-
-					break
-				} else {
-					if update == Scheduling {
-						log.Print("Scheduling -> not patch " + d.Name)
-					} else if update == Background {
-						log.Print("Background -> not patch " + d.Name)
-					}
-					break
-				}
-
-			}
-		}
-	} else {
-		return err
-	}
-
-	return nil
-}
 
 // This function:
 //  - checks if there is an available instance of Prometheus
@@ -484,7 +288,5 @@ func initKubernetesClient() (*kubernetesProvider, error) {
 }
 
 func initKubernetesCRDClient() (client.Client, error) {
-	return client.New(config.GetConfigOrDie(), client.Options{
-		Scheme: scheme,
-	})
+	return client.New(config.GetConfigOrDie(), client.Options{})
 }

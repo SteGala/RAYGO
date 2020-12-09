@@ -1,0 +1,23 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: job-profiler-pod
+  namespace: profiling
+spec:
+  restartPolicy: Never
+  containers:
+    - name: job-profiler-crownlabs
+      image: stegala/job-profiler:crownlabs
+      env:
+        - name: PROMETHEUS_URL
+          value: "10.99.210.148"
+        - name: PROMETHEUS_PORT
+          value: "9090"
+        - name: PROFILING_NAMESPACE
+          value: "" #empty means all the namespaces
+        - name: BACKGROUND_ROUTINE_ENABLED
+          value: "FALSE"
+        - name: TIMESLOTS
+          value: "4"
+        - name: OPERATING_MODE
+          value: "PROFILING" #accepted values are: PROFILING, PROFILING_SCHEDULING. PROFILING is the default
