@@ -1,6 +1,7 @@
 package profiling
 
 import (
+	"context"
 	crownlabsv1alpha1 "crownlabs.com/profiling/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -9,6 +10,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sync"
 	"time"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 
 	"crownlabs.com/profiling/internal/system"
 	"github.com/pkg/errors"
@@ -102,7 +105,8 @@ func (p *ProfilingSystem) printInitialInformation() {
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
 
-
+	list := &crownlabsv1alpha1.LabTemplateList{}
+	p.clientCRD.List(context.TODO(), list)
 
 	time.Sleep(time.Hour * time.Duration(24))
 
