@@ -1,0 +1,7 @@
+apiVersion: crownlabs.polito.it/v1alpha1
+kind: LabTemplate
+metadata:
+  name: labtemplate-sample
+spec:
+  # Add fields here
+  foo: bar

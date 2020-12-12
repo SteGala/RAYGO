@@ -1,13 +1,7 @@
-domain: liqo.io.profiling
-repo: github.io/Liqo/JobProfiler
+domain: polito.it
+repo: crownlabs.com/profiling
 resources:
-- group: webapp
-  kind: ConnectionProfile
-  version: v1
-- group: webapp
-  kind: MemoryProfile
-  version: v1
-- group: webapp
-  kind: CPUProfile
-  version: v1
+- group: crownlabs
+  kind: LabTemplate
+  version: v1alpha1
 version: "2"

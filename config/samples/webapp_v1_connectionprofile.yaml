@@ -1,7 +1,0 @@
-apiVersion: webapp.liqo.io.profiling/v1
-kind: ConnectionProfile
-metadata:
-  name: connectionprofile-sample
-spec:
-  # Add fields here
-  foo: bar

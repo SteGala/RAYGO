@@ -1,25 +1,33 @@
-module github.io/Liqo/JobProfiler
-// module github.io/SteGala/JobProfiler
+module crownlabs.com/profiling
 
 go 1.13
 
 require (
-	github.com/go-logr/logr v0.1.0
-	github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef // indirect
-	github.com/onsi/ginkgo v1.11.0
-	github.com/onsi/gomega v1.8.1
+	github.com/go-logr/logr v0.3.0 // indirect
+	github.com/go-logr/zapr v0.3.0 // indirect
+	github.com/googleapis/gnostic v0.5.3 // indirect
 	github.com/pkg/errors v0.9.1
-	go.uber.org/atomic v1.4.0 // indirect
-	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
-	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b // indirect
-	golang.org/x/sys v0.0.0-20191002063906-3421d5a6bb1c // indirect
-	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
+	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.0.1
-	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
-	gopkg.in/yaml.v2 v2.3.0 // indirect
-	k8s.io/api v0.17.3
-	k8s.io/apimachinery v0.17.3
-	k8s.io/client-go v0.17.3
-	sigs.k8s.io/controller-runtime v0.5.0
-	sigs.k8s.io/yaml v1.2.0 // indirect
+	k8s.io/api v0.19.0
+	k8s.io/apimachinery v0.19.0
+	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/utils v0.0.0-20201110183641-67b214c5f920 // indirect
+	kubevirt.io/client-go v0.35.0
+	sigs.k8s.io/controller-runtime v0.6.2
+)
+
+replace (
+	github.com/openshift/api => github.com/openshift/api v0.0.0-20191219222812-2987a591a72c
+	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20191125132246-f6563a70e19a
+	github.com/operator-framework/operator-lifecycle-manager => github.com/operator-framework/operator-lifecycle-manager v0.0.0-20190128024246-5eb7ae5bdb7a
+	k8s.io/api => k8s.io/api v0.19.0
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
+	k8s.io/apimachinery => k8s.io/apimachinery v0.19.0
+	k8s.io/apiserver => k8s.io/apiserver v0.19.0
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.19.0
+	k8s.io/client-go => k8s.io/client-go v0.19.0
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.19.0
+	sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v0.0.0-20190302045857-e85c7b244fd2
 )

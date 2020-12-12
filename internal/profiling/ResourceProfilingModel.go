@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.io/Liqo/JobProfiler/internal/datastructure"
-	"github.io/Liqo/JobProfiler/internal/system"
+	"crownlabs.com/profiling/internal/datastructure"
+	"crownlabs.com/profiling/internal/system"
 )
 
 type ResourceProfiling struct {
@@ -152,7 +152,6 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 
 	return
 }
-
 
 func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace string, schedulingTime time.Time) {
 	var records []system.ResourceRecord

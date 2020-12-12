@@ -2,14 +2,13 @@ package datastructure
 
 import (
 	"bytes"
+	"crownlabs.com/profiling/internal/system"
 	"errors"
 	"fmt"
 	"math"
 	"strings"
 	"sync"
 	"time"
-
-	"github.io/Liqo/JobProfiler/internal/system"
 )
 
 type CPUModel struct {

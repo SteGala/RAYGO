@@ -1,7 +1,7 @@
 package datastructure
 
 import (
-	"github.io/Liqo/JobProfiler/internal/system"
+	"crownlabs.com/profiling/internal/system"
 	"time"
 )
 

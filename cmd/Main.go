@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.io/Liqo/JobProfiler/internal/profiling"
+	"crownlabs.com/profiling/internal/profiling"
 	"log"
 	"os"
 )

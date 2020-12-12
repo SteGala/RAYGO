@@ -1,28 +1,20 @@
 package profiling
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
+	crownlabsv1alpha1 "crownlabs.com/profiling/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"log"
-	"os"
-	"strconv"
-	"strings"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sync"
 	"time"
 
+	"crownlabs.com/profiling/internal/system"
 	"github.com/pkg/errors"
-	"github.io/Liqo/JobProfiler/internal/system"
-	"gomodules.xyz/jsonpatch/v2"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 type kubernetesProvider struct {
@@ -32,7 +24,6 @@ type kubernetesProvider struct {
 }
 
 type ProfilingSystem struct {
-	connection                  ConnectionProfiling
 	memory                      ResourceProfiling
 	cpu                         ResourceProfiling
 	prometheus                  *system.PrometheusProvider
@@ -51,13 +42,23 @@ const (
 	Background UpdateType = 2
 )
 
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
+
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	_ = crownlabsv1alpha1.AddToScheme(scheme)
+	// +kubebuilder:scaffold:scheme
+}
+
 // Initialize the profiling system. Returns error if something unexpected happens in the init process.
 func (p *ProfilingSystem) Init() error {
 	var err error
 
 	p.printInitialInformation()
-
-	p.readEnvironmentVariables()
 
 	p.prometheus, p.client, err = runPreFlightCheck()
 	if err != nil {
@@ -84,36 +85,13 @@ func (p *ProfilingSystem) Init() error {
 
 func (p *ProfilingSystem) printInitialInformation() {
 
-	log.Print("--------------------------")
-	log.Print("|      Job Profiler      |")
-	log.Print("--------------------------")
+	log.Print("-----------------------------------")
+	log.Print("|      Job Profiler Crownlabs     |")
+	log.Print("-----------------------------------")
 
 	log.Print(" - Version: v0.1.5")
 	log.Print(" - Author: Stefano Galantino")
 	log.Println()
-}
-
-func (p *ProfilingSystem) readEnvironmentVariables() {
-	secondsStr := os.Getenv("BACKGROUND_ROUTINE_UPDATE_TIME")
-	if nSec, err := strconv.Atoi(secondsStr); err != nil {
-		p.backgroundRoutineUpdateTime = 5
-	} else {
-		p.backgroundRoutineUpdateTime = nSec
-	}
-
-	enabled := os.Getenv("BACKGROUND_ROUTINE_ENABLED")
-	if enabled == "TRUE" {
-		p.backgroundRoutineEnabled = true
-	} else {
-		p.backgroundRoutineEnabled = false
-	}
-
-	enabled = os.Getenv("OPERATING_MODE")
-	if enabled == "PROFILING_SCHEDULING" {
-		p.enableDeploymentUpdate = true
-	} else {
-		p.enableDeploymentUpdate = false
-	}
 }
 
 // StartProfiling starts the profiling system. It watches for pod creations and triggers:
@@ -123,35 +101,6 @@ func (p *ProfilingSystem) readEnvironmentVariables() {
 // to compute the profiling on each element. Each profiling is executed in a different thread
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
-	list := runtime.Object()
-
-	p.clientCRD.List(context.TODO(), list, metav1.ListOptions{})
-
-	/*watch, err := p.client.client.CoreV1().Pods(namespace).Watch(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	memChan := make(chan ResourceProfilingValue)
-	cpuChan := make(chan ResourceProfilingValue)
-
-	for event := range watch.ResultChan() {
-
-		if len(event.Object.(*v1.Pod).Status.Conditions) == 0 {
-			pod := event.Object.(*v1.Pod)
-			log.Print(" - SCHEDULING -\tpod: " + pod.Name)
-
-			schedulingTime := time.Now()
-
-			go p.memory.ComputePrediction(pod.Name, pod.Namespace, memChan, schedulingTime)
-			go p.cpu.ComputePrediction(pod.Name, pod.Namespace, cpuChan, schedulingTime)
-
-			memLabel := <-memChan
-			cpuLabel := <-cpuChan
-
-
-		}
-	}*/
 
 
 
@@ -160,84 +109,6 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 	return nil
 }
 
-func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel ResourceProfilingValue, cpuLabel ResourceProfilingValue, pod *v1.Pod) error {
-	addLabel := false
-
-	oJson, err := json.Marshal(pod)
-	if err != nil {
-		log.Fatalln(err)
-		return err
-	}
-
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	}
-
-	// ------------------------------------------------------------------------------
-	// IMPORTANT: if anything bad happens in the profiling of RAM, CPU or Connections
-	// no label are returned. In these situations are returned strings containing
-	// "empty" as value. This is why there is always the check [label != "empty"]
-	// ((NEED TO IMPROVE!!))
-	// ------------------------------------------------------------------------------
-
-	// add labels for connections
-	if connectionLabels != "empty" {
-		addLabel = true
-
-		for id, label := range strings.Split(connectionLabels, "\n") {
-			if label == "" {
-				continue
-			}
-
-			pod.Annotations["liqo.io/connectionProfile"+fmt.Sprintf("%d", id)] = label
-		}
-	}
-
-	// add label for memory
-	if memoryLabel.resourceType != system.None {
-		addLabel = true
-
-		pod.Annotations["liqo.io/memoryProfile"] = memoryLabel.label
-	}
-
-	// add label for cpu
-	if cpuLabel.resourceType != system.None {
-		addLabel = true
-
-		pod.Annotations["liqo.io/cpuProfile"] = cpuLabel.label
-	}
-
-	// if there is at least one label to add, the request to the API server is created
-	if addLabel {
-		mJson, err := json.Marshal(pod)
-		if err != nil {
-			log.Fatalln(err)
-			return err
-		}
-
-		patch, err := jsonpatch.CreatePatch(oJson, mJson)
-		if err != nil {
-			log.Fatalln(err)
-			return err
-		}
-
-		pb, err := json.MarshalIndent(patch, "", "  ")
-		if err != nil {
-			log.Fatalln(err)
-			return err
-		}
-
-		p.clientMutex.Lock()
-		defer p.clientMutex.Unlock()
-
-		// add labels to the pod
-		if _, err = p.client.client.CoreV1().Pods(pod.Namespace).Patch(pod.Name, types.JSONPatchType, pb); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
 
 
 // This function:
@@ -288,5 +159,7 @@ func initKubernetesClient() (*kubernetesProvider, error) {
 }
 
 func initKubernetesCRDClient() (client.Client, error) {
-	return client.New(config.GetConfigOrDie(), client.Options{})
+	return client.New(config.GetConfigOrDie(), client.Options{
+		Scheme: scheme,
+	})
 }
