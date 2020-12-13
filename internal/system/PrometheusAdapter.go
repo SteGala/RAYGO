@@ -230,7 +230,7 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 	var records []ResourceRecord
 
 	end := schedulingTime.Unix()
-	start := schedulingTime.AddDate(0, 0, -7).Unix()
+	start := schedulingTime.AddDate(0, 0, -14).Unix()
 
 	url := generateResourceURL(p.URLService, p.PortService, jobName, namespace, start, end, recordType)
 	resp, err := http.Get(url)
@@ -487,14 +487,14 @@ func generateResourceURL(ip string, port string, podName string, namespace strin
 			"pod%3D~%22virt-launcher-" + podName + ".*%22%7D)" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
-			"&step=60"
+			"&step=120"
 	} else {
 		return "http://" + ip + ":" + port +
 			"/api/v1/query_range?query=sum(node_namespace_pod_container%3Acontainer_cpu_usage_seconds_total%3Asum_rate%7B" +
 			"pod%3D~%22virt-launcher-" + podName + ".*%22%7D)%20by%20(pod%2C%20namespace)" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
-			"&step=60"
+			"&step=120"
 	}
 
 	// sum by (pod, namespace) (container_memory_usage_bytes{namespace="default", container!="POD", container!="", pod=~"ad.*"})

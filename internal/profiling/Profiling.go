@@ -111,7 +111,7 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 		memoryProfiling := p.memory.ComputePrediction(template.Name+"-xx-xx", template.Namespace, time.Now())
 		cpuProfiling := p.cpu.ComputePrediction(template.Name+"-xx-xx", template.Namespace, time.Now())
 
-		log.Print(memoryProfiling.job.Name + "{" + memoryProfiling.job.Namespace + "}")
+		log.Print(template.Name + "{" + template.Namespace + "}")
 		log.Printf("\tRAM: %s", memoryProfiling.value)
 		log.Printf("\tCPU: %s", cpuProfiling.value)
 	}
