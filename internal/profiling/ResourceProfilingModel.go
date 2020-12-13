@@ -88,9 +88,6 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 			label:        "",
 		}
 	}
-
-
-	return
 }
 
 func (rp *ResourceProfiling) updateResourceModel(jobName string, jobNamespace string, schedulingTime time.Time) {

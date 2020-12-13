@@ -108,8 +108,8 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 	}
 
 	for _, template := range list.Items {
-		memoryProfiling := p.memory.ComputePrediction(template.Name + "-xx-xx", template.Namespace, time.Now())
-		cpuProfiling := p.cpu.ComputePrediction(template.Name + "-xx-xx", template.Namespace, time.Now())
+		memoryProfiling := p.memory.ComputePrediction(template.Name+"-xx-xx", template.Namespace, time.Now())
+		cpuProfiling := p.cpu.ComputePrediction(template.Name+"-xx-xx", template.Namespace, time.Now())
 
 		log.Print(memoryProfiling.job.Name + "{" + memoryProfiling.job.Namespace + "}")
 		log.Printf("\tRAM: %s", memoryProfiling.value)
