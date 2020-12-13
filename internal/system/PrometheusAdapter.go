@@ -482,16 +482,16 @@ func generateResourceURL(ip string, port string, podName string, namespace strin
 
 	if recordType == Memory {
 		return "http://" + ip + ":" + port +
-			"/api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(container_memory_usage_bytes%7Bnamespace%3D%22" + namespace +
-			"%22%2C%20container!%3D%22POD%22%2C%20container!%3D%22%22%2C%20" +
-			"pod%3D~%22" + podName + ".*%22%7D)" +
+			"/api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(container_memory_usage_bytes" +
+			"%7Bcontainer!%3D%22POD%22%2C%20container!%3D%22%22%2C%20" +
+			"pod%3D~%22virt-launcher-" + podName + ".*%22%7D)" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
 			"&step=60"
 	} else {
 		return "http://" + ip + ":" + port +
 			"/api/v1/query_range?query=sum(node_namespace_pod_container%3Acontainer_cpu_usage_seconds_total%3Asum_rate%7B" +
-			"namespace%3D%22" + namespace + "%22%2C%20pod%3D~%22" + podName + ".*%22%7D)%20by%20(pod%2C%20namespace)" +
+			"pod%3D~%22virt-launcher-" + podName + ".*%22%7D)%20by%20(pod%2C%20namespace)" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
 			"&step=60"

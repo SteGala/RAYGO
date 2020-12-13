@@ -10,7 +10,7 @@ spec:
       image: stegala/job-profiler:crownlabs
       env:
         - name: PROMETHEUS_URL
-          value: "10.99.210.148"
+          value: "10.97.3.41"
         - name: PROMETHEUS_PORT
           value: "9090"
         - name: PROFILING_NAMESPACE

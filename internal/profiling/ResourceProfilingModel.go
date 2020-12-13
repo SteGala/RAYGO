@@ -51,80 +51,44 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, res syste
 //  - if the informations are still valid the prediction is computed, instead if the informetions are not present
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
-func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace string, c chan ResourceProfilingValue, schedulingTime time.Time) {
-	dataAvailable := true
-	//validTime := schedulingTime.AddDate(0, 0, -1)
+func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace string, schedulingTime time.Time) ResourceProfilingValue {
 
-	/*lastUpdate, err := rp.data.GetJobUpdateTime(extractDeploymentFromPodName(podName), podNamespace)
-	if err == nil {
-		// means there is already the corresponding job in the datastructure. Given that the job already exists
-		// the time of the last update needs to be checked; only if the records in the datastructure are older than
-		// 1 day they are updated
+	rp.updateResourceModel(podName, podNamespace, schedulingTime)
 
-		if lastUpdate.Before(validTime) {
-			// if last update is before the last valid date the record in the datastructure needs to be updated
+	rp.clientMutex.Lock()
+	defer rp.clientMutex.Unlock()
 
-			go rp.updateResourceModel(podName, podNamespace, schedulingTime)
-			dataAvailable = false
-			c <- ResourceProfilingValue{
-				resourceType: system.None,
-				value:        "",
-				label:        "",
-			}
-		}
-
-	} else {
-		// means that the job is not yet present in the datastructure so it needs to be added
-
-		go rp.updateResourceModel(podName, podNamespace, schedulingTime)
-		dataAvailable = false
-		c <- ResourceProfilingValue{
+	prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
+	if err != nil {
+		log.Print(err)
+		return ResourceProfilingValue{
 			resourceType: system.None,
 			value:        "",
 			label:        "",
 		}
-	}*/
+	}
 
-	if dataAvailable {
-		rp.updateResourceModel(podName, podNamespace, schedulingTime)
-
-		rp.clientMutex.Lock()
-		defer rp.clientMutex.Unlock()
-
-		prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
-		if err != nil {
-			log.Print(err)
-			c <- ResourceProfilingValue{
-				resourceType: system.None,
-				value:        "",
-				label:        "",
-			}
-			return
+	switch rp.data.(type) {
+	case *datastructure.MemoryModel:
+		return ResourceProfilingValue{
+			resourceType: system.Memory,
+			value:        prediction,
+			label:        "",
 		}
-
-		podLabel := "Hello world"
-
-		switch rp.data.(type) {
-		case *datastructure.MemoryModel:
-			c <- ResourceProfilingValue{
-				resourceType: system.Memory,
-				value:        prediction,
-				label:        podLabel,
-			}
-		case *datastructure.CPUModel:
-			c <- ResourceProfilingValue{
-				resourceType: system.CPU,
-				value:        prediction,
-				label:        podLabel,
-			}
-		default:
-			c <- ResourceProfilingValue{
-				resourceType: system.None,
-				value:        "",
-				label:        "",
-			}
+	case *datastructure.CPUModel:
+		return ResourceProfilingValue{
+			resourceType: system.CPU,
+			value:        prediction,
+			label:        "",
+		}
+	default:
+		return ResourceProfilingValue{
+			resourceType: system.None,
+			value:        "",
+			label:        "",
 		}
 	}
+
 
 	return
 }
