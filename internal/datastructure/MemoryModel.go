@@ -6,17 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"sync"
 	"time"
 )
 
 type MemoryModel struct {
-	jobs                     map[string]*memoryInfo
-	mutex                    sync.Mutex
-	timeslots                int
-	memoryFailThreshold      float64
-	memoryFailLowerThreshold float64
+	jobs      map[string]*memoryInfo
+	mutex     sync.Mutex
+	timeslots int
 }
 
 type memoryInfo struct {
@@ -25,13 +22,11 @@ type memoryInfo struct {
 	lastUpdate       time.Time
 }
 
-func InitMemoryModel(timeslots int, threshold float64, lowerThreshold float64) *MemoryModel {
+func InitMemoryModel(timeslots int) *MemoryModel {
 	return &MemoryModel{
-		jobs:                     make(map[string]*memoryInfo),
-		mutex:                    sync.Mutex{},
-		timeslots:                timeslots,
-		memoryFailThreshold:      threshold,
-		memoryFailLowerThreshold: lowerThreshold,
+		jobs:      make(map[string]*memoryInfo),
+		mutex:     sync.Mutex{},
+		timeslots: timeslots,
 	}
 }
 
@@ -145,100 +140,6 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 		//prediction := job.memoryPrediction[id] + job.memoryPrediction[id]*0.2
 		prediction := job.memoryPrediction[id]
 		return fmt.Sprintf("%.0f", prediction), nil
-	}
-}
-
-func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
-	type result struct {
-		podName      string
-		podNamespace string
-		avgFail      float64
-	}
-
-	var job system.Job
-	var sum = 0.0
-	var count = 0
-	memFailInfo := make([]result, 0, 5)
-	var maxThreshold float64
-	var minThreshold float64
-
-	if len(records) > 0 {
-		job = records[0].PodInformation
-	}
-
-	for id, record := range records {
-		if record.PodInformation.Name != job.Name || id == len(records)-1 {
-			var avg = 0.0
-
-			if count > 0 {
-				avg = sum / float64(count)
-			}
-
-			split := strings.Split(job.Name, "-")
-			l := len(split) - 1
-
-			memFailInfo = append(memFailInfo, result{
-				podName:      strings.Join(split[:l], "-"),
-				podNamespace: job.Namespace,
-				avgFail:      avg,
-			})
-
-			sum = 0.0
-			count = 0
-			job = record.PodInformation
-		}
-
-		count++
-		sum += record.Value
-	}
-
-	var avg = 0.0
-
-	for _, t := range memFailInfo {
-		avg += t.avgFail
-	}
-
-	if len(memFailInfo) > 0 {
-		avg = avg / float64(len(memFailInfo))
-	} else {
-		return
-	}
-
-	if len(memFailInfo) == 1 {
-		maxThreshold = mm.memoryFailThreshold + mm.memoryFailThreshold*0.25
-		minThreshold = mm.memoryFailThreshold - mm.memoryFailThreshold*0.25
-	} else {
-		maxThreshold = avg + avg*0.25
-		minThreshold = avg - avg*0.25
-	}
-
-	mm.mutex.Lock()
-	defer mm.mutex.Unlock()
-
-	for _, t := range memFailInfo {
-		key := t.podName + "{" + t.podNamespace + "}"
-
-		_, found := mm.jobs[key]
-
-		if t.avgFail > maxThreshold && found && t.avgFail > mm.memoryFailLowerThreshold && mm.jobs[key].memoryPrediction != nil {
-			currTime := time.Now()
-
-			id := generateTimeslotIndex(currTime, mm.timeslots)
-
-			mm.jobs[key].memoryPrediction[id] += mm.jobs[key].memoryPrediction[id] * computeResourceIncrease(t.avgFail, maxThreshold)
-		}
-
-		if t.avgFail < minThreshold && found && t.avgFail > mm.memoryFailLowerThreshold && mm.jobs[key].memoryPrediction != nil {
-			currTime := time.Now()
-
-			id := generateTimeslotIndex(currTime, mm.timeslots)
-
-			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * 0.25
-		}
-
-		if found {
-			mm.jobs[key].lastUpdate = time.Now()
-		}
 	}
 }
 

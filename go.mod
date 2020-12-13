@@ -9,8 +9,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
 	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
-	gomodules.xyz/jsonpatch/v2 v2.0.1
-	k8s.io/api v0.19.0
 	k8s.io/apimachinery v0.19.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920 // indirect

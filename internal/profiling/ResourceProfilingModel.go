@@ -36,34 +36,10 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, res syste
 		nTimeslots = 4
 	}
 
-	cpuThresholdStr := os.Getenv("CPU_THRESHOLD")
-	cpuThreshold, err := strconv.ParseFloat(cpuThresholdStr, 64)
-	if err != nil {
-		cpuThreshold = 0.5
-	}
-
-	memoryThresholdStr := os.Getenv("MEMORY_THRESHOLD")
-	memoryThreshold, err := strconv.ParseFloat(memoryThresholdStr, 64)
-	if err != nil {
-		memoryThreshold = 600.0
-	}
-
-	cpuLowerThresholdStr := os.Getenv("CPU_LOWER_THRESHOLD")
-	cpuLowerThreshold, err := strconv.ParseFloat(cpuLowerThresholdStr, 64)
-	if err != nil {
-		cpuLowerThreshold = 0.05
-	}
-
-	memoryLowerThresholdStr := os.Getenv("MEMORY_LOWER_THRESHOLD")
-	memoryLowerThreshold, err := strconv.ParseFloat(memoryLowerThresholdStr, 64)
-	if err != nil {
-		memoryLowerThreshold = 50.0
-	}
-
 	if res == system.Memory {
-		rp.data = datastructure.InitMemoryModel(nTimeslots, memoryThreshold, memoryLowerThreshold)
+		rp.data = datastructure.InitMemoryModel(nTimeslots)
 	} else if res == system.CPU {
-		rp.data = datastructure.InitCPUModel(nTimeslots, cpuThreshold, cpuLowerThreshold)
+		rp.data = datastructure.InitCPUModel(nTimeslots)
 	}
 }
 

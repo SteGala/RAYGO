@@ -6,17 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"sync"
 	"time"
 )
 
 type CPUModel struct {
-	jobs                        map[string]*cpuInfo
-	mutex                       sync.Mutex
-	timeslots                   int
-	cpuThrottlingThreshold      float64
-	cpuThrottlingLowerThreshold float64
+	jobs      map[string]*cpuInfo
+	mutex     sync.Mutex
+	timeslots int
 }
 
 type cpuInfo struct {
@@ -25,13 +22,11 @@ type cpuInfo struct {
 	lastUpdate     time.Time
 }
 
-func InitCPUModel(timeslots int, threshold float64, lowerThreshold float64) *CPUModel {
+func InitCPUModel(timeslots int) *CPUModel {
 	return &CPUModel{
-		jobs:                        make(map[string]*cpuInfo),
-		mutex:                       sync.Mutex{},
-		timeslots:                   timeslots,
-		cpuThrottlingThreshold:      threshold,
-		cpuThrottlingLowerThreshold: lowerThreshold,
+		jobs:      make(map[string]*cpuInfo),
+		mutex:     sync.Mutex{},
+		timeslots: timeslots,
 	}
 }
 
@@ -147,100 +142,6 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 		//prediction := job.cpuPrediction[id] + job.cpuPrediction[id]*0.2
 		prediction := job.cpuPrediction[id]
 		return fmt.Sprintf("%.3f", prediction), nil
-	}
-}
-
-func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
-	type result struct {
-		podName       string
-		podNamespace  string
-		avgThrottling float64
-	}
-
-	var job system.Job
-	var sum = 0.0
-	var count = 0
-	throttlingInfo := make([]result, 0, 5)
-	var maxThreshold float64
-	var minThreshold float64
-
-	if len(records) > 0 {
-		job = records[0].PodInformation
-	}
-
-	for id, record := range records {
-		if record.PodInformation.Name != job.Name || id == len(records)-1 {
-			var avg = 0.0
-
-			if count > 0 {
-				avg = sum / float64(count)
-			}
-
-			split := strings.Split(job.Name, "-")
-			l := len(split) - 1
-
-			throttlingInfo = append(throttlingInfo, result{
-				podName:       strings.Join(split[:l], "-"),
-				podNamespace:  job.Namespace,
-				avgThrottling: avg,
-			})
-
-			sum = 0.0
-			count = 0
-			job = record.PodInformation
-		}
-
-		count++
-		sum += record.Value
-	}
-
-	var avg = 0.0
-
-	for _, t := range throttlingInfo {
-		avg += t.avgThrottling
-	}
-
-	if len(throttlingInfo) > 0 {
-		avg = avg / float64(len(throttlingInfo))
-	} else {
-		return
-	}
-
-	if len(throttlingInfo) == 1 {
-		maxThreshold = cp.cpuThrottlingThreshold + cp.cpuThrottlingThreshold*0.25
-		minThreshold = cp.cpuThrottlingThreshold - cp.cpuThrottlingThreshold*0.25
-	} else {
-		maxThreshold = avg + avg*0.25
-		minThreshold = avg - avg*0.25
-	}
-
-	cp.mutex.Lock()
-	defer cp.mutex.Unlock()
-
-	for _, t := range throttlingInfo {
-		key := t.podName + "{" + t.podNamespace + "}"
-
-		_, found := cp.jobs[key]
-
-		if t.avgThrottling > maxThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
-			currTime := time.Now()
-
-			id := generateTimeslotIndex(currTime, cp.timeslots)
-
-			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * computeResourceIncrease(t.avgThrottling, maxThreshold)
-		}
-
-		if t.avgThrottling < minThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
-			currTime := time.Now()
-
-			id := generateTimeslotIndex(currTime, cp.timeslots)
-
-			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * 0.25
-		}
-
-		if found {
-			cp.jobs[key].lastUpdate = time.Now()
-		}
 	}
 }
 

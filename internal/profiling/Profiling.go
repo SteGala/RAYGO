@@ -3,21 +3,18 @@ package profiling
 import (
 	"context"
 	crownlabsv1alpha1 "crownlabs.com/profiling/api/v1alpha1"
+	"crownlabs.com/profiling/internal/system"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"log"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sync"
 	"time"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-
-	"crownlabs.com/profiling/internal/system"
-	"github.com/pkg/errors"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type kubernetesProvider struct {
@@ -106,14 +103,17 @@ func (p *ProfilingSystem) printInitialInformation() {
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
 
 	list := &crownlabsv1alpha1.LabTemplateList{}
-	p.clientCRD.List(context.TODO(), list)
+	if err := p.clientCRD.List(context.TODO(), list); err != nil {
+		return err
+	}
 
+	for _, template := range list.Items {
+		log.Print(template.Name + " " + template.Namespace)
+	}
 	time.Sleep(time.Hour * time.Duration(24))
 
 	return nil
 }
-
-
 
 // This function:
 //  - checks if there is an available instance of Prometheus

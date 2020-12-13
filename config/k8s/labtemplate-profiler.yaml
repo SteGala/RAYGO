@@ -1,0 +1,26 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: labtemplate-profiler-pod
+  namespace: labtemplate-profiling
+spec:
+  restartPolicy: Never
+  containers:
+    - name: labtemplate-profiler
+      image: stegala/job-profiler:crownlabs
+      env:
+        - name: PROMETHEUS_URL
+          value: "10.99.210.148"
+        - name: PROMETHEUS_PORT
+          value: "9090"
+        - name: PROFILING_NAMESPACE
+          value: "" #empty means all the namespaces
+        - name: TIMESLOTS
+          value: "1"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 1000m
+          memory: 512Mi
