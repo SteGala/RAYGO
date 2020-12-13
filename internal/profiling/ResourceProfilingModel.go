@@ -60,7 +60,7 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 
 	prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
 	if err != nil {
-		log.Print(err)
+		//log.Print(err)
 		return ResourceProfilingValue{
 			resourceType: system.None,
 			value:        "",

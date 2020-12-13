@@ -8,6 +8,7 @@ spec:
   containers:
     - name: labtemplate-profiler
       image: stegala/job-profiler:crownlabs
+      imagePullPolicy: Always
       env:
         - name: PROMETHEUS_URL
           value: "10.97.3.41"
