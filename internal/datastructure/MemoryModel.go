@@ -44,7 +44,7 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 		lastUpdate:       schedulingTime,
 	}
 
-	computeMemoryWeightedSignal(records, mm.timeslots)
+	computeMemoryWeightedSignal(records, mm.timeslots, schedulingTime)
 
 	peak := computeKPercentile(records, 100, mm.timeslots)
 
@@ -105,7 +105,7 @@ func computeMemoryCorrectionConstant(i int, timeslots int) float64 {
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
 
-func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int) {
+func computeMemoryWeightedSignal(records []system.ResourceRecord, timeSlots int, schedulingTime time.Time) {
 	numRecords := make([]int, timeSlots)
 	var podName string
 
