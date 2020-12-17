@@ -26,90 +26,7 @@ const (
 	None   ResourceType = 3
 )
 
-// ----------------------------------------
-
-type prometheusQueryResultConnection struct {
-	Status string
-	Data   prometheusDataConnection
-}
-
-type prometheusDataConnection struct {
-	ResultType string
-	Result     []prometheusResultConnection
-}
-
-type prometheusResultConnection struct {
-	Metric prometheusMetricConnection
-	Values []prometheusValuesConnection
-}
-
-type prometheusMetricConnection struct {
-	Source_workload                string
-	Destination_workload           string
-	Destination_workload_namespace string
-	Namespace                      string
-}
-
-type prometheusValuesConnection struct {
-	TimeStamp float64
-	Value     string
-}
-
-func (tp *prometheusValuesConnection) UnmarshalJSON(data []byte) error {
-	var v []interface{}
-	if err := json.Unmarshal(data, &v); err != nil {
-		fmt.Printf("Error whilde decoding %v\n", err)
-		return err
-	}
-
-	tp.Value = v[1].(string)
-	tp.TimeStamp = v[0].(float64)
-
-	return nil
-}
-
-// ----------------------------------------
-
-type prometheusQueryResultResource struct {
-	Status string
-	Data   prometheusDataResource
-}
-
-type prometheusDataResource struct {
-	ResultType string
-	Result     []prometheusResultResource
-}
-
-type prometheusResultResource struct {
-	Metric prometheusMetricResource
-	Values []prometheusValuesResource
-}
-
-type prometheusMetricResource struct {
-	Namespace string
-	Pod       string
-}
-
-type prometheusValuesResource struct {
-	TimeStamp float64
-	Value     string
-}
-
-func (tp *prometheusValuesResource) UnmarshalJSON(data []byte) error {
-	var v []interface{}
-	if err := json.Unmarshal(data, &v); err != nil {
-		fmt.Printf("Error whilde decoding %v\n", err)
-		return err
-	}
-
-	tp.Value = v[1].(string)
-	tp.TimeStamp = v[0].(float64)
-
-	return nil
-}
-
-// ----------------------------------------
-
+// internal representation of connection records
 type ConnectionRecord struct {
 	Date         time.Time
 	From         string
@@ -118,6 +35,7 @@ type ConnectionRecord struct {
 	Bandwidth    float64
 }
 
+// internal representation of resource records
 type ResourceRecord struct {
 	PodInformation Job
 	Date           time.Time
@@ -252,23 +170,50 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 
 	records = make([]ResourceRecord, 0, 100)
 
+	currDate := start
+
 	for _, pd := range res.Data.Result {
+		var record ResourceRecord
+
+		record.PodInformation.Name = pd.Metric.Pod
+		record.PodInformation.Namespace = pd.Metric.Namespace
+		currDate = start
 
 		for _, m := range pd.Values {
-			var record ResourceRecord
 
-			record.PodInformation.Name = pd.Metric.Pod
-			record.PodInformation.Namespace = pd.Metric.Namespace
+			for ; currDate <= end; currDate += 120 {
 
-			val, err := strconv.ParseFloat(m.Value, 64)
-			if err != nil {
-				return nil, err
+				if int64(m.TimeStamp) == currDate {
+					val, err := strconv.ParseFloat(m.Value, 64)
+					if err != nil {
+						return nil, err
+					}
+
+					record.Value = val
+					record.Date = time.Unix(int64(m.TimeStamp), 0)
+
+					records = append(records, record)
+
+					break
+				}
+
+				record.Value = 0
+				record.Date = time.Unix(currDate, 0)
+
+				records = append(records, record)
 			}
 
-			record.Value = val
-			record.Date = time.Unix(int64(m.TimeStamp), 0)
+			// prometheus returns a sample every 120 seconds
+			currDate += 120
+		}
 
-			records = append(records, record)
+		if currDate != end {
+			for ; currDate <= end; currDate += 120 {
+				record.Value = 0
+				record.Date = time.Unix(currDate, 0)
+
+				records = append(records, record)
+			}
 		}
 	}
 
