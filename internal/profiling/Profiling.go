@@ -13,7 +13,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -109,22 +108,35 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 	}
 
 	for _, template := range list.Items {
+
 		memoryProfiling := p.memory.ComputePrediction(template.Name+"-xx-xx", template.Namespace, time.Now())
 		cpuProfiling := p.cpu.ComputePrediction(template.Name+"-xx-xx", template.Namespace, time.Now())
 
 		log.Print(template.Name + " {" + template.Namespace + "}")
 
-		if memoryProfilingFloat, err := strconv.ParseFloat(memoryProfiling.value, 64); err != nil {
+		if memoryProfiling.resourceType == system.None {
+			log.Printf("\tRAM: (not enough informations)")
+		} else {
+			log.Printf("\tRAM: %s", memoryProfiling.value)
+		}
+
+		if cpuProfiling.resourceType == system.None {
+			log.Printf("\tCPU: (not enough informations)")
+		} else {
+			log.Printf("\tCPU: %s", cpuProfiling.value)
+		}
+
+		/*if memoryProfilingFloat, err := strconv.ParseFloat(memoryProfiling.value, 64); err != nil {
 			log.Printf("\tRAM: %.3f \tGB (not enough informations)", memoryProfilingFloat/float64(1000000000))
 		} else {
-			log.Printf("\tRAM: %.3f \tGB", memoryProfilingFloat/float64(1000000000))
+			log.Printf("\tRAM: %.3f \tGB", (memoryProfilingFloat+0.2*memoryProfilingFloat)/float64(1000000000))
 		}
 
 		if cpuProfilingFloat, err := strconv.ParseFloat(cpuProfiling.value, 64); err != nil {
 			log.Printf("\tCPU: %.2f \tCPU CORE(S) (not enough informations)", cpuProfilingFloat)
 		} else {
-			log.Printf("\tCPU: %.2f \tCPU CORE(S)", cpuProfilingFloat)
-		}
+			log.Printf("\tCPU: %.2f \tCPU CORE(S)", cpuProfilingFloat+0.2*cpuProfilingFloat)
+		}*/
 
 	}
 

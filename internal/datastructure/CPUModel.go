@@ -44,7 +44,25 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 		lastUpdate:    schedulingTime,
 	}
 
+	/*tmp := make([]float64, 10)
+	for _, v := range records {
+		if v.PodInformation.Name == "virt-launcher-tsr-lab2-alessio-sacco-1412-e8b2-vmi-brp66" {
+			tmp = append(tmp, v.Value)
+		}
+	}
+	log.Print(tmp)
+	log.Print()
+	log.Print()*/
+
 	computeCPUWeightedSignal(records, cp.timeslots)
+
+	/*tmp = make([]float64, 10)
+	for _, v := range records {
+		if v.PodInformation.Name == "virt-launcher-tsr-lab2-alessio-sacco-1412-e8b2-vmi-brp66" {
+			tmp = append(tmp, v.Value)
+		}
+	}
+	log.Print(tmp)*/
 
 	//peak := computePeakSignal(records, cp.timeslots)
 	percentile := computeKPercentile(records, 98, cp.timeslots)
@@ -101,7 +119,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeCPUCorrectionConstant(i int, timeslots int) float64 {
-	decayTime := 2880 / timeslots
+	decayTime := 7200
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -137,11 +155,7 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 	} else if job.cpuPrediction == nil {
 		return "", errors.New("Not enough informations in the cpu model")
 	} else {
-
-		id := generateTimeslotIndex(predictionTime, cp.timeslots)
-		//prediction := job.cpuPrediction[id] + job.cpuPrediction[id]*0.2
-		prediction := job.cpuPrediction[id]
-		return fmt.Sprintf("%.3f", prediction), nil
+		return fmt.Sprintf("%v", job.cpuPrediction), nil
 	}
 }
 

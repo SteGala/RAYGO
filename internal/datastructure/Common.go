@@ -56,10 +56,14 @@ func computeKPercentile(records []system.ResourceRecord, K int, timeSlots int) [
 	sortedRecords := make([][]float64, timeSlots)
 
 	for i := 0; i < timeSlots; i++ {
-		sortedRecords[i] = make([]float64, 10)
+		sortedRecords[i] = make([]float64, 2)
 	}
 
 	for _, record := range records {
+
+		if record.Value == 0 {
+			continue
+		}
 
 		id := generateTimeslotIndex(record.Date, timeSlots)
 

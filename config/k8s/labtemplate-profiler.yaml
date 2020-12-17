@@ -17,7 +17,7 @@ spec:
         - name: PROFILING_NAMESPACE
           value: "" #empty means all the namespaces
         - name: TIMESLOTS
-          value: "1"
+          value: "4"
       resources:
         requests:
           cpu: 100m
