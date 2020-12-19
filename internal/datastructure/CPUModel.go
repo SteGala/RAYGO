@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.io/Liqo/JobProfiler/internal/monitoring"
 	"math"
-	"strings"
 	"sync"
 	"time"
 
@@ -37,6 +37,7 @@ func InitCPUModel(timeslots int, threshold float64, lowerThreshold float64) *CPU
 }
 
 func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord, schedulingTime time.Time) {
+	key := jobName + "{" + namespace + "}"
 
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
@@ -61,7 +62,24 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 		job.cpuPrediction = nil
 	}
 
-	cp.jobs[jobName+"{"+namespace+"}"] = &job
+	/*
+		if c, found := cp.jobs[key]; found {
+			if c.cpuPrediction == nil {
+				cp.jobs[key] = &job
+			} else {
+				for i := 0; i < cp.timeslots; i++ {
+					if job.cpuPrediction != nil {
+						c.cpuPrediction[i] = c.cpuPrediction[i]*0.6 + job.cpuPrediction[i]*0.4
+					}
+				}
+				c.lastUpdate = job.lastUpdate
+			}
+		} else {
+			cp.jobs[key] = &job
+		}
+	*/
+	cp.jobs[key] = &job
+	monitoring.ExposeCPUProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponential", job.cpuPrediction[generateTimeslotIndex(time.Now(), cp.timeslots)])
 }
 
 func (cp *CPUModel) GetJobUpdateTime(jobName string, namespace string) (time.Time, error) {
@@ -107,7 +125,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeCPUCorrectionConstant(i int, timeslots int) float64 {
-	decayTime := 720 / timeslots
+	decayTime := 3600 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -153,17 +171,20 @@ func (cp *CPUModel) GetJobPrediction(jobName string, namespace string, predictio
 
 func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 	type result struct {
-		podName       string
-		podNamespace  string
-		avgThrottling float64
+		podName          string
+		podNamespace     string
+		avgThrottling    float64
+		linearPrediction float64
 	}
 
 	var job system.Job
 	var sum = 0.0
-	var count = 0
+	var count = 0.0
 	throttlingInfo := make([]result, 0, 5)
-	var maxThreshold float64
-	var minThreshold float64
+	sumX := 0.0
+	sumX2 := 0.0
+	sumY := 0.0
+	sumXY := 0.0
 
 	if len(records) > 0 {
 		job = records[0].PodInformation
@@ -171,48 +192,38 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 
 	for id, record := range records {
 		if record.PodInformation.Name != job.Name || id == len(records)-1 {
-			var avg = 0.0
+			var a, b, avg float64
 
 			if count > 0 {
-				avg = sum / float64(count)
+				b = (count*sumXY - sumX*sumY) / (count*sumX2 - sumX*sumX)
+				a = (sumY - b*sumX) / (count)
+				avg = sum / count
 			}
 
-			split := strings.Split(job.Name, "-")
-			l := len(split) - 1
-
 			throttlingInfo = append(throttlingInfo, result{
-				podName:       strings.Join(split[:l], "-"),
-				podNamespace:  job.Namespace,
-				avgThrottling: avg,
+				podName:          job.Name,
+				podNamespace:     job.Namespace,
+				avgThrottling:    avg,
+				linearPrediction: b*(count+1.0) + a,
 			})
 
 			sum = 0.0
-			count = 0
+			sumX = 0.0
+			sumX2 = 0.0
+			sumY = 0.0
+			sumXY = 0.0
+			count = 0.0
 			job = record.PodInformation
 		}
 
-		count++
 		sum += record.Value
-	}
 
-	var avg = 0.0
+		sumX += count
+		sumX2 += count * count
+		sumY += record.Value
+		sumXY += count * record.Value
 
-	for _, t := range throttlingInfo {
-		avg += t.avgThrottling
-	}
-
-	if len(throttlingInfo) > 0 {
-		avg = avg / float64(len(throttlingInfo))
-	} else {
-		return
-	}
-
-	if len(throttlingInfo) == 1 {
-		maxThreshold = cp.cpuThrottlingThreshold + cp.cpuThrottlingThreshold*0.25
-		minThreshold = cp.cpuThrottlingThreshold - cp.cpuThrottlingThreshold*0.25
-	} else {
-		maxThreshold = avg + avg*0.25
-		minThreshold = avg - avg*0.25
+		count++
 	}
 
 	cp.mutex.Lock()
@@ -220,27 +231,26 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 
 	for _, t := range throttlingInfo {
 		key := t.podName + "{" + t.podNamespace + "}"
+		currTime := time.Now()
 
 		_, found := cp.jobs[key]
 
-		if t.avgThrottling > maxThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
-			currTime := time.Now()
+		maxThreshold := t.avgThrottling + t.avgThrottling*0.25
+		minThreshold := t.avgThrottling - t.avgThrottling*0.25
 
+		if found && t.linearPrediction > maxThreshold && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
 			id := generateTimeslotIndex(currTime, cp.timeslots)
-
-			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * computeResourceIncrease(t.avgThrottling, maxThreshold)
+			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * computeResourceIncrease(t.linearPrediction, maxThreshold)
 		}
 
-		if t.avgThrottling < minThreshold && found && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
-			currTime := time.Now()
-
+		if found && t.linearPrediction < minThreshold && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
 			id := generateTimeslotIndex(currTime, cp.timeslots)
-
-			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * 0.25
+			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * computeResourceDecrease(t.linearPrediction, minThreshold)
 		}
 
 		if found {
-			cp.jobs[key].lastUpdate = time.Now()
+			cp.jobs[key].lastUpdate = currTime
+			monitoring.ExposeCPUProfiling(cp.jobs[key].jobInformation.Name, cp.jobs[key].jobInformation.Namespace, "runtime", cp.jobs[key].cpuPrediction[generateTimeslotIndex(currTime, cp.timeslots)])
 		}
 	}
 }

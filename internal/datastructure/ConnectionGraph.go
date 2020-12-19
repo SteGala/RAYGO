@@ -178,7 +178,6 @@ func (cg *ConnectionGraph) GetJobUpdateTime(jobName string, namespace string) (t
 
 // The function returns the Name and the Namespace of the job with the oldest update time
 func (cg *ConnectionGraph) GetLastUpdatedJob() (string, string, error) {
-
 	lastUpdate := time.Now()
 	var jobName, jobNamespace string
 	found := false

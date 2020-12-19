@@ -111,7 +111,7 @@ func (p *ProfilingSystem) printInitialInformation() {
 	log.Print("|      Job Profiler      |")
 	log.Print("--------------------------")
 
-	log.Print(" - Version: v0.1.5")
+	log.Print(" - Version: v0.1.7")
 	log.Print(" - Author: Stefano Galantino")
 	log.Println()
 }
@@ -156,9 +156,18 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 	cpuChan := make(chan ResourceProfilingValue)
 
 	for event := range watch.ResultChan() {
+		pod, ok := event.Object.(*v1.Pod)
+		if !ok {
+			// if the cast is not allowed recreate the watcher
+			watch.Stop()
+			watch, err = p.client.client.CoreV1().Pods(namespace).Watch( /*context.TODO(), */ metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+		}
 
 		if len(event.Object.(*v1.Pod).Status.Conditions) == 0 {
-			pod := event.Object.(*v1.Pod)
+			pod = event.Object.(*v1.Pod)
 			log.Print(" - SCHEDULING -\tpod: " + pod.Name)
 
 			schedulingTime := time.Now()
@@ -197,6 +206,8 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 	cpuChan := make(chan ResourceProfilingValues)
 	memChan := make(chan ResourceProfilingValues)
 
+	//time.Sleep(time.Duration(10) * time.Minute)
+
 	for {
 		if job, err := p.memory.data.GetLastUpdatedJob(); err == nil {
 			log.Print(" - BACKGROUND -\tpod: " + job.Name)
@@ -204,7 +215,6 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 			profilingTime := time.Now()
 
 			if jobConnections, err := p.connection.GetJobConnections(job, profilingTime); err == nil {
-				//log.Print(jobConnections)
 				go p.cpu.UpdatePrediction(jobConnections, cpuChan, profilingTime)
 				go p.memory.UpdatePrediction(jobConnections, memChan, profilingTime)
 
@@ -321,6 +331,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	// add label for memory
 	if memoryLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
+
+			// Mi conversion
 			s /= 1000000
 
 			if s < 50 {
@@ -337,9 +349,10 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	// add label for cpu
 	if cpuLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
+			//s += s * 0.1
 
-			if s < 0.05 {
-				s = 0.05
+			if s < 0.02 {
+				s = 0.02
 			}
 
 			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
@@ -442,7 +455,7 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 func runPreFlightCheck() (*system.PrometheusProvider, *kubernetesProvider, error) {
 
 	var prometheus system.PrometheusProvider
-	var kubernetes *kubernetesProvider
+	var kubernetesClient *kubernetesProvider
 	var err error
 
 	err = prometheus.InitPrometheusSystem()
@@ -452,31 +465,31 @@ func runPreFlightCheck() (*system.PrometheusProvider, *kubernetesProvider, error
 
 	log.Print("[CHECKED] Connection to Prometheus established")
 
-	kubernetes, err = initKubernetesClient()
+	kubernetesClient, err = initKubernetesClient()
 	if err != nil {
 		return nil, nil, err
 	}
 
 	log.Print("[CHECKED] Integration with Kubernetes established")
 
-	return &prometheus, kubernetes, nil
+	return &prometheus, kubernetesClient, nil
 }
 
 func initKubernetesClient() (*kubernetesProvider, error) {
 	//Set to in-cluster config.
-	config, err := rest.InClusterConfig()
+	configuration, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "error building in cluster config")
 	}
 
-	client, err := kubernetes.NewForConfig(config)
+	kubernetesClient, err := kubernetes.NewForConfig(configuration)
 	if err != nil {
 		return nil, err
 	}
 
 	provider := kubernetesProvider{
-		client:    client,
-		config:    config,
+		client:    kubernetesClient,
+		config:    configuration,
 		startTime: time.Now(),
 	}
 

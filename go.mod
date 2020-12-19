@@ -1,4 +1,5 @@
 module github.io/Liqo/JobProfiler
+
 // module github.io/SteGala/JobProfiler
 
 go 1.13
@@ -9,6 +10,7 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.0.0
 	go.uber.org/atomic v1.4.0 // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b // indirect
