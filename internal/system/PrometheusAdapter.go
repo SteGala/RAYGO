@@ -181,7 +181,7 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 
 		for _, m := range pd.Values {
 
-			for ; currDate <= end; currDate += 120 {
+			for ; currDate <= end; currDate += 60 {
 
 				if int64(m.TimeStamp) == currDate {
 					val, err := strconv.ParseFloat(m.Value, 64)
@@ -204,11 +204,11 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 			}
 
 			// prometheus returns a sample every 120 seconds
-			currDate += 120
+			currDate += 60
 		}
 
 		if currDate != end {
-			for ; currDate <= end; currDate += 120 {
+			for ; currDate <= end; currDate += 60 {
 				record.Value = 0
 				record.Date = time.Unix(currDate, 0)
 
