@@ -2,6 +2,10 @@ package profiling
 
 import (
 	"context"
+	"log"
+	"sync"
+	"time"
+
 	crownlabsv1alpha1 "crownlabs.com/profiling/api/v1alpha1"
 	"crownlabs.com/profiling/internal/system"
 	"github.com/pkg/errors"
@@ -9,12 +13,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"log"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sync"
-	"time"
+	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
 type kubernetesProvider struct {
@@ -33,6 +35,22 @@ type ProfilingSystem struct {
 	backgroundRoutineUpdateTime int
 	backgroundRoutineEnabled    bool
 	enableDeploymentUpdate      bool
+}
+
+type Value struct {
+	time			time.Time
+	CPUvalue		string 
+	RAMValue		string
+}
+
+type VMInfo struct{
+	vmName		string
+	values		Value
+}
+
+type ProfilingResults struct {
+	testTime		time.Time
+	vmInfo			[]VMInfo
 }
 
 type UpdateType int
@@ -102,45 +120,63 @@ func (p *ProfilingSystem) printInitialInformation() {
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
 
+	startDate := time.Parse("2006-01-02", "2021-01-01")
+	currDate := time.Now()
+	var result ProfilingResults{
+		testTime: 	currDate
+		vmInfo: 	make([]VMInfo, 5)
+	}
+	
+
 	list := &crownlabsv1alpha1.LabTemplateList{}
 	if err := p.clientCRD.List(context.TODO(), list); err != nil {
 		return err
 	}
 
 	for _, template := range list.Items {
-
-		memoryProfiling := p.memory.ComputePrediction(template.Name+"-xx-xx", template.Namespace, time.Now())
-		cpuProfiling := p.cpu.ComputePrediction(template.Name+"-xx-xx", template.Namespace, time.Now())
-
-		log.Print(template.Name + " {" + template.Namespace + "}")
-
-		if memoryProfiling.resourceType == system.None {
-			log.Printf("\tRAM: (not enough informations)")
-		} else {
-			log.Printf("\tRAM: %s", memoryProfiling.value)
+		
+		var vmInfo VMInfo{
+			vmName: temtemplate.Name,
+			values: make([]Value, 5),
 		}
 
-		if cpuProfiling.resourceType == system.None {
-			log.Printf("\tCPU: (not enough informations)")
-		} else {
-			log.Printf("\tCPU: %s", cpuProfiling.value)
+		for d := startDate ; d.After(currDate) == false ; d = d.AddDate(0, 0, 1){
+			var v Value{
+				time:	d
+			}
+
+			memoryProfiling := p.memory.ComputePrediction(template.Name+"-xx-xx", template.Namespace, d)
+			cpuProfiling := p.cpu.ComputePrediction(template.Name+"-xx-xx", template.Namespace, d)
+	
+			//log.Print(template.Name + " {" + template.Namespace + "}")
+	
+			if memoryProfiling.resourceType == system.None {
+				//log.Printf("\tRAM: (not enough informations)")
+				v.RAMValue = "NaN"
+			} else {
+				//log.Printf("\tRAM: %s", memoryProfiling.value)
+				v.RAMValue = memoryProfiling.value
+			}
+	
+			if cpuProfiling.resourceType == system.None {
+				//log.Printf("\tCPU: (not enough informations)")
+				v.CPUvalue = "NaN"
+			} else {
+				//log.Printf("\tCPU: %s", cpuProfiling.value)
+				v.CPUvalue = cpuProfiling.value
+			}
+
+			vmInfo.values = append(vmInfo.values, v)
 		}
 
-		/*if memoryProfilingFloat, err := strconv.ParseFloat(memoryProfiling.value, 64); err != nil {
-			log.Printf("\tRAM: %.3f \tGB (not enough informations)", memoryProfilingFloat/float64(1000000000))
-		} else {
-			log.Printf("\tRAM: %.3f \tGB", (memoryProfilingFloat+0.2*memoryProfilingFloat)/float64(1000000000))
-		}
-
-		if cpuProfilingFloat, err := strconv.ParseFloat(cpuProfiling.value, 64); err != nil {
-			log.Printf("\tCPU: %.2f \tCPU CORE(S) (not enough informations)", cpuProfilingFloat)
-		} else {
-			log.Printf("\tCPU: %.2f \tCPU CORE(S)", cpuProfilingFloat+0.2*cpuProfilingFloat)
-		}*/
-
+		result.vmInfo = append(result.vmInfo, vmInfo)
 	}
 
-	time.Sleep(time.Hour * time.Duration(24))
+	file, _ := json.MarshalIndent(result, "", " ")
+ 
+	_ = ioutil.WriteFile("profiling_results.json", file, 0644)
+
+	//time.Sleep(time.Hour * time.Duration(24))
 
 	return nil
 }
