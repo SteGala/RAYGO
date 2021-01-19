@@ -2,6 +2,8 @@ package profiling
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"sync"
 	"time"
@@ -120,11 +122,11 @@ func (p *ProfilingSystem) printInitialInformation() {
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
 
-	startDate := time.Parse("2006-01-02", "2021-01-01")
+	startDate, _ := time.Parse("2006-01-02", "2021-01-01")
 	currDate := time.Now()
-	var result ProfilingResults{
-		testTime: 	currDate
-		vmInfo: 	make([]VMInfo, 5)
+	result := ProfilingResults{
+		testTime: 	currDate,
+		vmInfo: 	make([]VMInfo, 5),
 	}
 	
 
@@ -135,14 +137,14 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 
 	for _, template := range list.Items {
 		
-		var vmInfo VMInfo{
-			vmName: temtemplate.Name,
+		vmInfo := VMInfo{
+			vmName: template.Name,
 			values: make([]Value, 5),
 		}
 
 		for d := startDate ; d.After(currDate) == false ; d = d.AddDate(0, 0, 1){
-			var v Value{
-				time:	d
+			v := Value{
+				time:	d,
 			}
 
 			memoryProfiling := p.memory.ComputePrediction(template.Name+"-xx-xx", template.Namespace, d)
