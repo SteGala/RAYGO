@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	crownlabsv1alpha1 "crownlabs.com/profiling/api/v1alpha1"
+	crownlabsv1alpha1 "crownlabs.com/profiling/api/v1alpha2"
 	"crownlabs.com/profiling/internal/system"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,7 +18,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
 type kubernetesProvider struct {
@@ -40,19 +39,19 @@ type ProfilingSystem struct {
 }
 
 type Value struct {
-	time			time.Time
-	CPUvalue		string 
-	RAMValue		string
+	time     int64  `json:"time"`
+	CPUvalue string `json:"cpu_value"`
+	RAMValue string `json:"ram_value"`
 }
 
-type VMInfo struct{
-	vmName		string
-	values		Value
+type VMInfo struct {
+	vmName string  `json:"vm_name"`
+	values []Value `json:"values"`
 }
 
 type ProfilingResults struct {
-	testTime		time.Time
-	vmInfo			[]VMInfo
+	testTime int64    `json:"test_time"`
+	vmInfo   []VMInfo `json:"results"`
 }
 
 type UpdateType int
@@ -122,36 +121,41 @@ func (p *ProfilingSystem) printInitialInformation() {
 // and the execution is synchronized using channels
 func (p *ProfilingSystem) StartProfiling(namespace string) error {
 
-	startDate, _ := time.Parse("2006-01-02", "2021-01-01")
-	currDate := time.Now()
+	startDate, _ := time.Parse("2006-01-02", "2020-11-02")
+	currDate, _ := time.Parse("2006-01-02", "2021-01-24")
 	result := ProfilingResults{
-		testTime: 	currDate,
-		vmInfo: 	make([]VMInfo, 5),
+		testTime: currDate.Unix(),
+		vmInfo:   make([]VMInfo, 0, 10),
 	}
-	
 
-	list := &crownlabsv1alpha1.LabTemplateList{}
+	list := &crownlabsv1alpha1.TemplateList{}
 	if err := p.clientCRD.List(context.TODO(), list); err != nil {
 		return err
 	}
 
+	log.Printf("Found %d Templates", len(list.Items))
+
 	for _, template := range list.Items {
-		
+
+		log.Printf("Analyzing %s", template.Name)
+
 		vmInfo := VMInfo{
 			vmName: template.Name,
-			values: make([]Value, 5),
+			values: make([]Value, 0, 5),
 		}
 
-		for d := startDate ; d.After(currDate) == false ; d = d.AddDate(0, 0, 1){
+		for d := startDate; d.After(currDate) == false; d = d.AddDate(0, 0, 1) {
+			//log.Print(d)
+
 			v := Value{
-				time:	d,
+				time: d.Unix(),
 			}
 
 			memoryProfiling := p.memory.ComputePrediction(template.Name+"-xx-xx", template.Namespace, d)
 			cpuProfiling := p.cpu.ComputePrediction(template.Name+"-xx-xx", template.Namespace, d)
-	
+
 			//log.Print(template.Name + " {" + template.Namespace + "}")
-	
+
 			if memoryProfiling.resourceType == system.None {
 				//log.Printf("\tRAM: (not enough informations)")
 				v.RAMValue = "NaN"
@@ -159,7 +163,7 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 				//log.Printf("\tRAM: %s", memoryProfiling.value)
 				v.RAMValue = memoryProfiling.value
 			}
-	
+
 			if cpuProfiling.resourceType == system.None {
 				//log.Printf("\tCPU: (not enough informations)")
 				v.CPUvalue = "NaN"
@@ -172,13 +176,23 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 		}
 
 		result.vmInfo = append(result.vmInfo, vmInfo)
+
+		break
 	}
 
-	file, _ := json.MarshalIndent(result, "", " ")
- 
-	_ = ioutil.WriteFile("profiling_results.json", file, 0644)
+	file, err := json.Marshal(result)
+	if err != nil {
+		log.Print(err)
+	}
 
-	//time.Sleep(time.Hour * time.Duration(24))
+	err = ioutil.WriteFile("profiling_results.json", file, 0644)
+	if err != nil {
+		log.Print(err)
+	}
+
+	log.Print(result)
+
+	time.Sleep(time.Hour * time.Duration(24))
 
 	return nil
 }

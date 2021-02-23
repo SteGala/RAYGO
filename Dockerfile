@@ -1,5 +1,7 @@
 # Build the manager binary
-FROM golang:1.13 as builder
+FROM golang:1.15.7-alpine3.13
+
+ENV PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -16,12 +18,4 @@ COPY internal/ internal/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager cmd/Main.go
-
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
-WORKDIR /
-COPY --from=builder /workspace/manager .
-USER nonroot:nonroot
-
-ENTRYPOINT ["/manager"]
+CMD ./manager

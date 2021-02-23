@@ -2,6 +2,6 @@ domain: polito.it
 repo: crownlabs.com/profiling
 resources:
 - group: crownlabs
-  kind: LabTemplate
-  version: v1alpha1
+  kind: Template
+  version: v1alpha2
 version: "2"

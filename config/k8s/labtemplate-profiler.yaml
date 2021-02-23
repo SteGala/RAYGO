@@ -11,7 +11,7 @@ spec:
       imagePullPolicy: Always
       env:
         - name: PROMETHEUS_URL
-          value: "10.97.3.41"
+          value: "10.100.99.4"
         - name: PROMETHEUS_PORT
           value: "9090"
         - name: PROFILING_NAMESPACE
@@ -20,8 +20,8 @@ spec:
           value: "4"
       resources:
         requests:
-          cpu: 100m
+          cpu: 1000m
           memory: 64Mi
         limits:
-          cpu: 1000m
-          memory: 512Mi
+          cpu: 1200m
+          memory: 2048Mi
