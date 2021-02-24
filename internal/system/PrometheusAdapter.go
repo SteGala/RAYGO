@@ -96,7 +96,7 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 	var res prometheusQueryResultConnection
 
 	end := schedulingTime.Unix()
-	start := schedulingTime.AddDate(0, 0, -7).Unix()
+	start := schedulingTime.Add(time.Minute * (-60)).Unix()
 
 	url := generateConnectionURL(p.URLService, p.PortService, jobName, namespace, requestType, start, end)
 
@@ -148,7 +148,7 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 	var records []ResourceRecord
 
 	end := schedulingTime.Unix()
-	start := schedulingTime.AddDate(0, 0, -7).Unix()
+	start := schedulingTime.Add(time.Minute * (-60)).Unix()
 
 	url := generateResourceURL(p.URLService, p.PortService, jobName, namespace, start, end, recordType)
 	resp, err := http.Get(url)
@@ -232,7 +232,7 @@ func (p *PrometheusProvider) GetCPUThrottlingRecords(jobs []Job) ([]ResourceReco
 	}
 
 	end := time.Now().Unix()
-	start := time.Now().Add(time.Second * (-120)).Unix()
+	start := time.Now().Add(time.Second * (-300)).Unix()
 
 	url := generateCPUThrottleURL(p.URLService, p.PortService, jobs, start, end)
 	//log.Print(url)
@@ -291,7 +291,7 @@ func (p *PrometheusProvider) GetMemoryFailRecords(jobs []Job) ([]ResourceRecord,
 	}
 
 	end := time.Now().Unix()
-	start := time.Now().Add(time.Second * (-120)).Unix()
+	start := time.Now().Add(time.Second * (-300)).Unix()
 
 	url := generateMemoryFailURL(p.URLService, p.PortService, jobs, start, end)
 	//log.Print(url)
@@ -364,7 +364,7 @@ func generateMemoryFailURL(ip string, port string, jobs []Job, start int64, end 
 		"/api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(label_replace(rate(container_memory_failures_total%7B" +
 		"namespace%3D~%22" + differentNamespaces.String() +
 		"pod%3D~%22" + differentPod.String() +
-		"container!%3D%22%22%7D%5B1m%5D)%2C%20%22pod%22%2C%20%22%241%22%2C%20%22pod%22%2C%20%22(.*)-.%7B5%7D%22))" +
+		"container!%3D%22POD%22%2C%20container!%3D%22%22%7D%5B5m%5D)%2C%20%22pod%22%2C%20%22%241%22%2C%20%22pod%22%2C%20%22(.*)-(.%7B7%2C10%7D-.%7B5%7D)%24%22))" +
 		"&start=" + strconv.Itoa(int(start)) +
 		"&end=" + strconv.Itoa(int(end)) +
 		"&step=1"
@@ -390,7 +390,7 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 		if id != len(jobs)-1 {
 			differentPod.WriteString(".*%7C")
 		} else {
-			differentPod.WriteString(".*%22%7D%5B1m%5D)")
+			differentPod.WriteString(".*%22%2C%20%20")
 		}
 	}
 
@@ -399,7 +399,7 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 		differentNamespaces.String() +
 		"pod%3D~%22" +
 		differentPod.String() +
-		"%2C%20%22pod%22%2C%20%22%241%22%2C%20%22pod%22%2C%20%22(.*)-.%7B5%7D%22))" +
+		"container!%3D%22POD%22%2C%20container!%3D%22%22%7D%5B5m%5D)%2C%20%22pod%22%2C%20%22%241%22%2C%20%22pod%22%2C%20%22(.*)-(.%7B7%2C10%7D-.%7B5%7D)%24%22))" +
 		"&start=" + strconv.Itoa(int(start)) +
 		"&end=" + strconv.Itoa(int(end)) +
 		"&step=1"
@@ -418,7 +418,7 @@ func generateConnectionURL(ip string, port string, podName string, namespace str
 		"%22%7D%5B1m%5D))" +
 		"&start=" + strconv.Itoa(int(start)) +
 		"&end=" + strconv.Itoa(int(end)) +
-		"&step=60"
+		"&step=1"
 
 	// sum by(namespace, source_workload, destination_workload, destination_workload_namespace) (increase(istio_request_bytes_sum{namespace="default", source_workload="productpage-v1"}[1m]))
 }
@@ -432,14 +432,14 @@ func generateResourceURL(ip string, port string, podName string, namespace strin
 			"pod%3D~%22" + podName + ".*%22%7D)" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
-			"&step=60"
+			"&step=1"
 	} else {
 		return "http://" + ip + ":" + port +
 			"/api/v1/query_range?query=sum(node_namespace_pod_container%3Acontainer_cpu_usage_seconds_total%3Asum_rate%7B" +
 			"namespace%3D%22" + namespace + "%22%2C%20pod%3D~%22" + podName + ".*%22%7D)%20by%20(pod%2C%20namespace)" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
-			"&step=60"
+			"&step=1"
 	}
 
 	// sum by (pod, namespace) (container_memory_usage_bytes{namespace="default", container!="POD", container!="", pod=~"ad.*"})

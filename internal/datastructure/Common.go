@@ -61,6 +61,11 @@ func computeKPercentile(records []system.ResourceRecord, K int, timeSlots int) [
 
 	for _, record := range records {
 
+		// needs to be updated
+		if record.Value == 0 {
+			continue
+		}
+
 		id := generateTimeslotIndex(record.Date, timeSlots)
 
 		sortedRecords[id] = append(sortedRecords[id], record.Value)
@@ -138,11 +143,11 @@ func generateTimeslotIndex(date time.Time, nTimeslots int) int {
 	return -1
 }
 
-// the returned value is always >=0.3 and <1
+// the returned value is always >=0.1 and <1
 func computeResourceIncrease(value float64, avg float64) float64 {
 	x := value / avg
 
-	increase := 0.1 * math.Exp(x/5.0)
+	increase := 0.15 * math.Exp(x/3.0)
 
 	if increase > 1 {
 		increase = 1
@@ -152,9 +157,13 @@ func computeResourceIncrease(value float64, avg float64) float64 {
 }
 
 func computeResourceDecrease(value float64, avg float64) float64 {
+	if value <= 0 {
+		return 0.5
+	}
+
 	x := avg / value
 
-	decrease := 0.2 * math.Exp(x/5.0)
+	decrease := 0.1 * math.Exp(x/2.0)
 
 	if decrease > 0.5 {
 		decrease = 0.5

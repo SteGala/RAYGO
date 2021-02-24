@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.io/Liqo/JobProfiler/internal/monitoring"
 	"math"
-	"strings"
 	"sync"
 	"time"
 
@@ -37,6 +37,7 @@ func InitMemoryModel(timeslots int, threshold float64, lowerThreshold float64) *
 }
 
 func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord, schedulingTime time.Time) {
+	key := jobName + "{" + namespace + "}"
 
 	mm.mutex.Lock()
 	defer mm.mutex.Unlock()
@@ -60,7 +61,24 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 		job.memoryPrediction = nil
 	}
 
-	mm.jobs[jobName+"{"+namespace+"}"] = &job
+	/*
+		if c, found := mm.jobs[key]; found {
+			if c.memoryPrediction == nil {
+				mm.jobs[key] = &job
+			} else {
+				for i := 0; i < mm.timeslots; i++ {
+					if job.memoryPrediction != nil {
+						c.memoryPrediction[i] = c.memoryPrediction[i]*0.6 + job.memoryPrediction[i]*0.4
+					}
+				}
+				c.lastUpdate = job.lastUpdate
+			}
+		} else {
+			mm.jobs[key] = &job
+		}
+	*/
+	mm.jobs[key] = &job
+	monitoring.ExposeMemoryProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponenial", job.memoryPrediction[generateTimeslotIndex(time.Now(), mm.timeslots)])
 }
 
 func (mm *MemoryModel) GetJobUpdateTime(jobName string, namespace string) (time.Time, error) {
@@ -106,7 +124,7 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeMemoryCorrectionConstant(i int, timeslots int) float64 {
-	decayTime := 720 / timeslots
+	decayTime := 3600 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -151,17 +169,20 @@ func (mm *MemoryModel) GetJobPrediction(jobName string, namespace string, predic
 
 func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 	type result struct {
-		podName      string
-		podNamespace string
-		avgFail      float64
+		podName          string
+		podNamespace     string
+		avgFail          float64
+		linearPrediction float64
 	}
 
 	var job system.Job
 	var sum = 0.0
-	var count = 0
+	var count = 0.0
 	memFailInfo := make([]result, 0, 5)
-	var maxThreshold float64
-	var minThreshold float64
+	sumX := 0.0
+	sumX2 := 0.0
+	sumY := 0.0
+	sumXY := 0.0
 
 	if len(records) > 0 {
 		job = records[0].PodInformation
@@ -169,48 +190,42 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 
 	for id, record := range records {
 		if record.PodInformation.Name != job.Name || id == len(records)-1 {
-			var avg = 0.0
+			var a, b, avg float64
 
 			if count > 0 {
-				avg = sum / float64(count)
+				b = (count*sumXY - sumX*sumY) / (count*sumX2 - sumX*sumX)
+				a = (sumY - b*sumX) / (count)
+				avg = sum / count
 			}
 
-			split := strings.Split(job.Name, "-")
-			l := len(split) - 1
+			/*split := strings.Split(job.Name, "-")
+			l := len(split) - 1*/
 
 			memFailInfo = append(memFailInfo, result{
-				podName:      strings.Join(split[:l], "-"),
-				podNamespace: job.Namespace,
-				avgFail:      avg,
+				/*				podName:          strings.Join(split[:l], "-"),
+				 */podName:       job.Name,
+				podNamespace:     job.Namespace,
+				avgFail:          avg,
+				linearPrediction: b*(count+1.0) + a,
 			})
 
 			sum = 0.0
-			count = 0
+			sumX = 0.0
+			sumX2 = 0.0
+			sumY = 0.0
+			sumXY = 0.0
+			count = 0.0
 			job = record.PodInformation
 		}
 
-		count++
 		sum += record.Value
-	}
 
-	var avg = 0.0
+		sumX += count
+		sumX2 += count * count
+		sumY += record.Value
+		sumXY += count * record.Value
 
-	for _, t := range memFailInfo {
-		avg += t.avgFail
-	}
-
-	if len(memFailInfo) > 0 {
-		avg = avg / float64(len(memFailInfo))
-	} else {
-		return
-	}
-
-	if len(memFailInfo) == 1 {
-		maxThreshold = mm.memoryFailThreshold + mm.memoryFailThreshold*0.25
-		minThreshold = mm.memoryFailThreshold - mm.memoryFailThreshold*0.25
-	} else {
-		maxThreshold = avg + avg*0.25
-		minThreshold = avg - avg*0.25
+		count++
 	}
 
 	mm.mutex.Lock()
@@ -218,27 +233,28 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 
 	for _, t := range memFailInfo {
 		key := t.podName + "{" + t.podNamespace + "}"
+		currTime := time.Now()
 
 		_, found := mm.jobs[key]
 
-		if t.avgFail > maxThreshold && found && t.avgFail > mm.memoryFailLowerThreshold && mm.jobs[key].memoryPrediction != nil {
-			currTime := time.Now()
+		//log.Printf("MEM\tPod: %s\tFail: %.3f Prediction: %.3f", t.podName, t.avgFail, t.linearPrediction)
 
+		maxThreshold := t.avgFail + t.avgFail*0.25
+		minThreshold := t.avgFail - t.avgFail*0.25
+
+		if found && t.linearPrediction > maxThreshold && t.avgFail > mm.memoryFailLowerThreshold && mm.jobs[key].memoryPrediction != nil {
 			id := generateTimeslotIndex(currTime, mm.timeslots)
-
-			mm.jobs[key].memoryPrediction[id] += mm.jobs[key].memoryPrediction[id] * computeResourceIncrease(t.avgFail, maxThreshold)
+			mm.jobs[key].memoryPrediction[id] += mm.jobs[key].memoryPrediction[id] * computeResourceIncrease(t.linearPrediction, maxThreshold)
 		}
 
-		if t.avgFail < minThreshold && found && t.avgFail > mm.memoryFailLowerThreshold && mm.jobs[key].memoryPrediction != nil {
-			currTime := time.Now()
-
+		if found && t.linearPrediction < minThreshold && t.avgFail > mm.memoryFailLowerThreshold && mm.jobs[key].memoryPrediction != nil {
 			id := generateTimeslotIndex(currTime, mm.timeslots)
-
-			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * 0.25
+			mm.jobs[key].memoryPrediction[id] -= mm.jobs[key].memoryPrediction[id] * computeResourceDecrease(t.linearPrediction, minThreshold)
 		}
 
 		if found {
-			mm.jobs[key].lastUpdate = time.Now()
+			mm.jobs[key].lastUpdate = currTime
+			monitoring.ExposeMemoryProfiling(mm.jobs[key].jobInformation.Name, mm.jobs[key].jobInformation.Namespace, "runtime", mm.jobs[key].memoryPrediction[generateTimeslotIndex(currTime, mm.timeslots)])
 		}
 	}
 }
