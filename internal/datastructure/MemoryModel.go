@@ -55,8 +55,9 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 
 	peak := computeKPercentile(records, 100, mm.timeslots)
 
-	if len(records) > 10 {
+	if len(records) > 300 {
 		job.memoryPrediction = peak
+		monitoring.ExposeMemoryProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponenial", job.memoryPrediction[generateTimeslotIndex(time.Now(), mm.timeslots)])
 	} else {
 		job.memoryPrediction = nil
 	}
@@ -78,7 +79,6 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 		}
 	*/
 	mm.jobs[key] = &job
-	monitoring.ExposeMemoryProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponenial", job.memoryPrediction[generateTimeslotIndex(time.Now(), mm.timeslots)])
 }
 
 func (mm *MemoryModel) GetJobUpdateTime(jobName string, namespace string) (time.Time, error) {

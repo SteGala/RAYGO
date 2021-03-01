@@ -56,8 +56,9 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 	//peak := computePeakSignal(records, cp.timeslots)
 	percentile := computeKPercentile(records, 98, cp.timeslots)
 
-	if len(records) > 10 {
+	if len(records) > 300 {
 		job.cpuPrediction = percentile
+		monitoring.ExposeCPUProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponential", job.cpuPrediction[generateTimeslotIndex(time.Now(), cp.timeslots)])
 	} else {
 		job.cpuPrediction = nil
 	}
@@ -79,7 +80,6 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 		}
 	*/
 	cp.jobs[key] = &job
-	monitoring.ExposeCPUProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponential", job.cpuPrediction[generateTimeslotIndex(time.Now(), cp.timeslots)])
 }
 
 func (cp *CPUModel) GetJobUpdateTime(jobName string, namespace string) (time.Time, error) {

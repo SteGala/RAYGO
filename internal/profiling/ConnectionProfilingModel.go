@@ -42,7 +42,6 @@ func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClie
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
 func (cp *ConnectionProfiling) ComputePrediction(podName string, podNamespace string, c chan string, schedulingTime time.Time) {
-	dataAvailable := true
 	validTime := schedulingTime.AddDate(0, 0, -1)
 
 	lastUpdate, err := cp.graph.GetJobUpdateTime(extractDeploymentFromPodName(podName), podNamespace)
@@ -55,23 +54,20 @@ func (cp *ConnectionProfiling) ComputePrediction(podName string, podNamespace st
 			// if last update is before the last valid date the record in the datastructure needs to be updated
 
 			go cp.updateConnectionGraph(podName, podNamespace, schedulingTime)
-			dataAvailable = false
 			c <- "empty"
+			return
 		}
 
 	} else {
 		// means that the job is not yet present in the datastructure so it needs to be added
 
 		go cp.updateConnectionGraph(podName, podNamespace, schedulingTime)
-		dataAvailable = false
 		c <- "empty"
+		return
 	}
 
-	if dataAvailable {
-
-		podLabels := cp.createConnectionCRD(podName, podNamespace, schedulingTime)
-		c <- podLabels
-	}
+	podLabels := cp.createConnectionCRD(podName, podNamespace, schedulingTime)
+	c <- podLabels
 
 	return
 }

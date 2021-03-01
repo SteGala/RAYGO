@@ -82,7 +82,6 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
 func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace string, c chan ResourceProfilingValue, schedulingTime time.Time) {
-	dataAvailable := true
 	validTime := schedulingTime.AddDate(0, 0, -1)
 
 	lastUpdate, err := rp.data.GetJobUpdateTime(extractDeploymentFromPodName(podName), podNamespace)
@@ -94,63 +93,63 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 		if lastUpdate.Before(validTime) {
 			// if last update is before the last valid date the record in the datastructure needs to be updated
 
-			go rp.updateResourceModel(podName, podNamespace, schedulingTime)
-			dataAvailable = false
-			c <- ResourceProfilingValue{
-				resourceType: system.None,
-				value:        "",
-				label:        "",
-			}
+			rp.updateResourceModel(podName, podNamespace, schedulingTime)
+			//c <- ResourceProfilingValue{
+			//	resourceType: system.None,
+			//	value:        "",
+			//	label:        "",
+			//}
+			//return
 		}
 
 	} else {
 		// means that the job is not yet present in the datastructure so it needs to be added
 
-		go rp.updateResourceModel(podName, podNamespace, schedulingTime)
-		dataAvailable = false
+		rp.updateResourceModel(podName, podNamespace, schedulingTime)
+/*		c <- ResourceProfilingValue{
+			resourceType: system.None,
+			value:        "",
+			label:        "",
+		}
+		return
+
+ */
+	}
+
+	rp.clientMutex.Lock()
+	defer rp.clientMutex.Unlock()
+
+	prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
+	if err != nil {
+		log.Print(err)
 		c <- ResourceProfilingValue{
 			resourceType: system.None,
 			value:        "",
 			label:        "",
 		}
+		return
 	}
 
-	if dataAvailable {
-		rp.clientMutex.Lock()
-		defer rp.clientMutex.Unlock()
+	podLabel := rp.createResourceCRD(podName, podNamespace, prediction, schedulingTime)
 
-		prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
-		if err != nil {
-			log.Print(err)
-			c <- ResourceProfilingValue{
-				resourceType: system.None,
-				value:        "",
-				label:        "",
-			}
-			return
+	switch rp.data.(type) {
+	case *datastructure.MemoryModel:
+		c <- ResourceProfilingValue{
+			resourceType: system.Memory,
+			value:        prediction,
+			label:        podLabel,
 		}
-
-		podLabel := rp.createResourceCRD(podName, podNamespace, prediction, schedulingTime)
-
-		switch rp.data.(type) {
-		case *datastructure.MemoryModel:
-			c <- ResourceProfilingValue{
-				resourceType: system.Memory,
-				value:        prediction,
-				label:        podLabel,
-			}
-		case *datastructure.CPUModel:
-			c <- ResourceProfilingValue{
-				resourceType: system.CPU,
-				value:        prediction,
-				label:        podLabel,
-			}
-		default:
-			c <- ResourceProfilingValue{
-				resourceType: system.None,
-				value:        "",
-				label:        "",
-			}
+	case *datastructure.CPUModel:
+		c <- ResourceProfilingValue{
+			resourceType: system.CPU,
+			value:        prediction,
+			label:        podLabel,
+		}
+	default:
+		c <- ResourceProfilingValue{
+			resourceType: system.None,
+			value:        "",
+			label:        "",
 		}
 	}
 
