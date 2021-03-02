@@ -171,3 +171,15 @@ func computeResourceDecrease(value float64, avg float64) float64 {
 
 	return decrease
 }
+
+func countNonZeroRecords(records []system.ResourceRecord) int {
+	count := 0
+
+	for _, r := range records {
+		if r.Value != 0 {
+			count++
+		}
+	}
+
+	return count
+}

@@ -8,9 +8,10 @@ spec:
   containers:
     - name: job-profiler
       image: stegala/job-profiler
+      imagePullPolicy: Always
       env:
         - name: PROMETHEUS_URL
-          value: "10.99.210.148"
+          value: "10.107.132.193"
         - name: PROMETHEUS_PORT
           value: "9090"
         - name: PROFILING_NAMESPACE

@@ -106,14 +106,14 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 		// means that the job is not yet present in the datastructure so it needs to be added
 
 		rp.updateResourceModel(podName, podNamespace, schedulingTime)
-/*		c <- ResourceProfilingValue{
-			resourceType: system.None,
-			value:        "",
-			label:        "",
-		}
-		return
+		/*		c <- ResourceProfilingValue{
+					resourceType: system.None,
+					value:        "",
+					label:        "",
+				}
+				return
 
- */
+		*/
 	}
 
 	rp.clientMutex.Lock()
@@ -121,7 +121,7 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 
 	prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
 	if err != nil {
-		log.Print(err)
+		//log.Print(err)
 		c <- ResourceProfilingValue{
 			resourceType: system.None,
 			value:        "",
@@ -177,6 +177,7 @@ func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan Resource
 			rpv.value = ""
 			rpv.label = ""
 			rpv.resourceType = system.None
+			rpv.job = job
 		} else {
 			crdName := rp.createResourceCRD(job.Name, job.Namespace, prediction, profilingTime)
 

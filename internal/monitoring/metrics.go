@@ -2,7 +2,8 @@ package monitoring
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"net/http"
 )
 
 var (
@@ -25,8 +26,23 @@ var (
 
 func init() {
 	// Register custom metrics with the global prometheus registry
-	_ = metrics.Registry.Register(cpuProfiling)
-	_ = metrics.Registry.Register(memoryProfiling)
+	prometheus.MustRegister(cpuProfiling)
+	prometheus.MustRegister(memoryProfiling)
+
+	go func() {
+
+		http.Handle("/metrics", promhttp.HandlerFor(
+			prometheus.DefaultGatherer,
+			promhttp.HandlerOpts{
+				// Opt into OpenMetrics to support exemplars.
+				EnableOpenMetrics: true,
+			},
+		))
+
+		// There may be multiple calls to the init function, the first one will succeed in the port binding
+		// the following ones will fail. One HTTP handler will always be available
+		_ = http.ListenAndServe(":8090", nil)
+	}()
 }
 
 func ExposeMemoryProfiling(depName string, depNamespace string, pType string, value float64) {

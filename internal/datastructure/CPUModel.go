@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/Liqo/JobProfiler/internal/monitoring"
+	"log"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
@@ -39,6 +40,8 @@ func InitCPUModel(timeslots int, threshold float64, lowerThreshold float64) *CPU
 func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord, schedulingTime time.Time) {
 	key := jobName + "{" + namespace + "}"
 
+	log.Print("Gathering historical data fo job " + jobName + ". Collected CPU records: " + strconv.Itoa(countNonZeroRecords(records)))
+
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
 
@@ -56,9 +59,9 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 	//peak := computePeakSignal(records, cp.timeslots)
 	percentile := computeKPercentile(records, 98, cp.timeslots)
 
-	if len(records) > 300 {
+	if countNonZeroRecords(records) > 300 {
 		job.cpuPrediction = percentile
-		monitoring.ExposeCPUProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponential", job.cpuPrediction[generateTimeslotIndex(time.Now(), cp.timeslots)])
+		//monitoring.ExposeCPUProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponential", job.cpuPrediction[generateTimeslotIndex(time.Now(), cp.timeslots)])
 	} else {
 		job.cpuPrediction = nil
 	}
@@ -250,7 +253,7 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 
 		if found {
 			cp.jobs[key].lastUpdate = currTime
-			monitoring.ExposeCPUProfiling(cp.jobs[key].jobInformation.Name, cp.jobs[key].jobInformation.Namespace, "runtime", cp.jobs[key].cpuPrediction[generateTimeslotIndex(currTime, cp.timeslots)])
+			//monitoring.ExposeCPUProfiling(cp.jobs[key].jobInformation.Name, cp.jobs[key].jobInformation.Namespace, "runtime", cp.jobs[key].cpuPrediction[generateTimeslotIndex(currTime, cp.timeslots)])
 		}
 	}
 }

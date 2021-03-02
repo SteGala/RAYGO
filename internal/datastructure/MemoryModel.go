@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/Liqo/JobProfiler/internal/monitoring"
+	"log"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
@@ -39,6 +40,8 @@ func InitMemoryModel(timeslots int, threshold float64, lowerThreshold float64) *
 func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord, schedulingTime time.Time) {
 	key := jobName + "{" + namespace + "}"
 
+	log.Print("Gathering historical data fo job " + jobName + ". Collected RAM records: " + strconv.Itoa(countNonZeroRecords(records)))
+
 	mm.mutex.Lock()
 	defer mm.mutex.Unlock()
 
@@ -55,9 +58,9 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 
 	peak := computeKPercentile(records, 100, mm.timeslots)
 
-	if len(records) > 300 {
+	if countNonZeroRecords(records) > 300 {
 		job.memoryPrediction = peak
-		monitoring.ExposeMemoryProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponenial", job.memoryPrediction[generateTimeslotIndex(time.Now(), mm.timeslots)])
+		//monitoring.ExposeMemoryProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponenial", job.memoryPrediction[generateTimeslotIndex(time.Now(), mm.timeslots)])
 	} else {
 		job.memoryPrediction = nil
 	}
@@ -254,7 +257,7 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 
 		if found {
 			mm.jobs[key].lastUpdate = currTime
-			monitoring.ExposeMemoryProfiling(mm.jobs[key].jobInformation.Name, mm.jobs[key].jobInformation.Namespace, "runtime", mm.jobs[key].memoryPrediction[generateTimeslotIndex(currTime, mm.timeslots)])
+			//monitoring.ExposeMemoryProfiling(mm.jobs[key].jobInformation.Name, mm.jobs[key].jobInformation.Namespace, "runtime", mm.jobs[key].memoryPrediction[generateTimeslotIndex(currTime, mm.timeslots)])
 		}
 	}
 }

@@ -331,39 +331,44 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	// add label for memory
 	if memoryLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
+			// increase by 15% for safety margin
+			s += s * 0.15
 
 			// Mi conversion
 			s /= 1000000
 
+			//set some lower bounds
 			if s < 50 {
 				s = 50
 			}
 
 			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s) + "Mi")
-			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 2*s) + "Mi")
+			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 1.5*s) + "Mi")
 		}
 	} else {
-		return errors.New("No data available for memory")
+		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort resource/limits update")
 	}
 
 	// add label for cpu
 	if cpuLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
-			//s += s * 0.1
+			// increase by 15% for safety margin
+			s += s * 0.15
 
+			//set some lower bounds
 			if s < 0.02 {
 				s = 0.02
 			}
 
 			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
-			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", 2*s))
+			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", 1.5*s))
 			cpuRLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
 			cpuRUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
-			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 2*s-2*s*0.15))
-			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 2*s+2*s*0.15))
+			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 1.5*s-1.5*s*0.15))
+			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 1.5*s+1.5*s*0.15))
 		}
 	} else {
-		return errors.New("No data available for cpu")
+		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort resource/limits update")
 	}
 
 	p.clientMutex.Lock()
@@ -375,8 +380,6 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 
 				memRequest := podRequest["memory"]
 				memLimit := podLimit["memory"]
-				//cpuRequest := podRequest["cpu"]
-				//cpuLimit := podLimit["cpu"]
 
 				oJson, err := json.Marshal(d)
 				if err != nil {
@@ -398,8 +401,6 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 					} else if update == Background {
 						log.Print("Background -> patch " + d.Name)
 					}
-					//log.Print(podLimit)
-					//log.Print(podRequest)
 
 					d.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
 						Limits:   podLimit,
@@ -427,9 +428,6 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 					if _, err = p.client.client.AppsV1().Deployments(job.Namespace).Patch(d.Name, types.JSONPatchType, pb); err != nil {
 						return err
 					}
-
-					//time.Sleep(1*time.Second)
-
 					break
 				} else {
 					if update == Scheduling {
