@@ -11,7 +11,7 @@ spec:
       imagePullPolicy: Always
       env:
         - name: PROMETHEUS_URL
-          value: "10.107.132.193"
+          value: "prometheus-k8s.monitoring.svc"
         - name: PROMETHEUS_PORT
           value: "9090"
         - name: PROFILING_NAMESPACE
