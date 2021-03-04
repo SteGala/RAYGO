@@ -332,7 +332,7 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	if memoryLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(memoryLabel.value, 64); err == nil {
 			// increase by 30% for safety margin
-			s += s * 0.3
+			s += s * 0.5
 
 			// Mi conversion
 			s /= 1000000
@@ -343,7 +343,7 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			}
 
 			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s) + "Mi")
-			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 1.6*s) + "Mi")
+			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 1.5*s) + "Mi")
 		}
 	} else {
 		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort resource/limits update")
@@ -353,7 +353,7 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	if cpuLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
 			// increase by 30% for safety margin
-			s += s * 0.3
+			s += s * 0.5
 
 			//set some lower bounds
 			if s < 0.02 {
@@ -364,8 +364,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", 1.5*s))
 			cpuRLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
 			cpuRUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
-			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 1.6*s-1.6*s*0.15))
-			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 1.6*s+1.6*s*0.15))
+			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 1.5*s-1.5*s*0.15))
+			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 1.5*s+1.5*s*0.15))
 		}
 	} else {
 		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort resource/limits update")
