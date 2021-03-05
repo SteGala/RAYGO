@@ -3,6 +3,8 @@ apiVersion: v1
 metadata:
   name: job-profiler-pod
   namespace: profiling
+  labels:
+    app: profiling
 spec:
   restartPolicy: Never
   containers:
@@ -17,7 +19,7 @@ spec:
         - name: PROFILING_NAMESPACE
           value: "test-stefano" #empty means all the namespaces
         - name: BACKGROUND_ROUTINE_UPDATE_TIME
-          value: "120"
+          value: "150"
         - name: BACKGROUND_ROUTINE_ENABLED
           value: "TRUE"
         - name: TIMESLOTS
@@ -32,3 +34,38 @@ spec:
           value: "50.0"
         - name: OPERATING_MODE
           value: "PROFILING_SCHEDULING" #accepted values are: PROFILING, PROFILING_SCHEDULING. PROFILING is the default
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: profiling
+  name: job-profiler-pod
+  namespace: profiling
+spec:
+  ports:
+    - port: 8090
+      protocol: TCP
+      targetPort: 8090
+      name: metrics
+  selector:
+    app: profiling
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: profiler-metrics-monitor
+  namespace: profiling
+spec:
+  endpoints:
+    - path: /metrics
+      port: metrics
+      interval: 1s
+  selector:
+    matchLabels:
+      app: profiling
+

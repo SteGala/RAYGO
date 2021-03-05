@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
+	"github.io/Liqo/JobProfiler/internal/monitoring"
 	"math"
-	"strconv"
 	"sync"
 	"time"
 
@@ -40,7 +39,7 @@ func InitMemoryModel(timeslots int, threshold float64, lowerThreshold float64) *
 func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord, schedulingTime time.Time) {
 	key := jobName + "{" + namespace + "}"
 
-	log.Print("Gathering historical data fo job " + jobName + ". Collected RAM records: " + strconv.Itoa(countNonZeroRecords(records)))
+	//log.Print("Gathering historical data fo job " + jobName + ". Collected RAM records: " + strconv.Itoa(countNonZeroRecords(records)))
 
 	mm.mutex.Lock()
 	defer mm.mutex.Unlock()
@@ -60,27 +59,29 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 
 	if countNonZeroRecords(records) > 300 {
 		job.memoryPrediction = peak
-		//monitoring.ExposeMemoryProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponenial", job.memoryPrediction[generateTimeslotIndex(time.Now(), mm.timeslots)])
+		monitoring.ExposeMemoryProfiling(jobName, namespace, "exponenial", job.memoryPrediction[generateTimeslotIndex(time.Now(), mm.timeslots)])
 	} else {
 		job.memoryPrediction = nil
 	}
 
 	/*
-		if c, found := mm.jobs[key]; found {
-			if c.memoryPrediction == nil {
-				mm.jobs[key] = &job
-			} else {
-				for i := 0; i < mm.timeslots; i++ {
-					if job.memoryPrediction != nil {
-						c.memoryPrediction[i] = c.memoryPrediction[i]*0.6 + job.memoryPrediction[i]*0.4
-					}
-				}
-				c.lastUpdate = job.lastUpdate
-			}
+	if c, found := mm.jobs[key]; found {
+		if c.memoryPrediction == nil {
+			mm.jobs[key] = &job
 		} else {
+			for i := 0; i < mm.timeslots; i++ {
+				if job.memoryPrediction != nil {
+					job.memoryPrediction[i] = c.memoryPrediction[i]*0.8 + job.memoryPrediction[i]*0.2
+				}
+			}
 			mm.jobs[key] = &job
 		}
-	*/
+	} else {
+		mm.jobs[key] = &job
+	}
+
+	 */
+
 	mm.jobs[key] = &job
 }
 
@@ -127,7 +128,7 @@ func (mm *MemoryModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeMemoryCorrectionConstant(i int, timeslots int) float64 {
-	decayTime := 3600 / timeslots
+	decayTime := 900 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }

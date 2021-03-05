@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
+	"github.io/Liqo/JobProfiler/internal/monitoring"
 	"math"
-	"strconv"
 	"sync"
 	"time"
 
@@ -40,7 +39,7 @@ func InitCPUModel(timeslots int, threshold float64, lowerThreshold float64) *CPU
 func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system.ResourceRecord, schedulingTime time.Time) {
 	key := jobName + "{" + namespace + "}"
 
-	log.Print("Gathering historical data fo job " + jobName + ". Collected CPU records: " + strconv.Itoa(countNonZeroRecords(records)))
+	//log.Print("Gathering historical data fo job " + jobName + ". Collected CPU records: " + strconv.Itoa(countNonZeroRecords(records)))
 
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
@@ -61,27 +60,29 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 
 	if countNonZeroRecords(records) > 300 {
 		job.cpuPrediction = percentile
-		//monitoring.ExposeCPUProfiling(job.jobInformation.Name, job.jobInformation.Namespace, "exponential", job.cpuPrediction[generateTimeslotIndex(time.Now(), cp.timeslots)])
+		monitoring.ExposeCPUProfiling(jobName, namespace, "exponential", job.cpuPrediction[generateTimeslotIndex(time.Now(), cp.timeslots)])
 	} else {
 		job.cpuPrediction = nil
 	}
 
 	/*
-		if c, found := cp.jobs[key]; found {
-			if c.cpuPrediction == nil {
-				cp.jobs[key] = &job
-			} else {
-				for i := 0; i < cp.timeslots; i++ {
-					if job.cpuPrediction != nil {
-						c.cpuPrediction[i] = c.cpuPrediction[i]*0.6 + job.cpuPrediction[i]*0.4
-					}
-				}
-				c.lastUpdate = job.lastUpdate
-			}
+	if c, found := cp.jobs[key]; found {
+		if c.cpuPrediction == nil {
+			cp.jobs[key] = &job
 		} else {
+			for i := 0; i < cp.timeslots; i++ {
+				if job.cpuPrediction != nil {
+					job.cpuPrediction[i] = c.cpuPrediction[i]*0.8 + job.cpuPrediction[i]*0.2
+				}
+			}
 			cp.jobs[key] = &job
 		}
-	*/
+	} else {
+		cp.jobs[key] = &job
+	}
+
+	 */
+
 	cp.jobs[key] = &job
 }
 
@@ -128,7 +129,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeCPUCorrectionConstant(i int, timeslots int) float64 {
-	decayTime := 3600 / timeslots
+	decayTime := 900 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
