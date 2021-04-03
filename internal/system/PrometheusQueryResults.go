@@ -7,26 +7,48 @@ import (
 
 // ----------------------------------------
 
-type prometheusQueryResultConnection struct {
+type prometheusIstioQueryResultConnection struct {
 	Status string
-	Data   prometheusDataConnection
+	Data   prometheusIstioDataConnection
 }
 
-type prometheusDataConnection struct {
+type prometheusIstioDataConnection struct {
 	ResultType string
-	Result     []prometheusResultConnection
+	Result     []prometheusIstioResultConnection
 }
 
-type prometheusResultConnection struct {
-	Metric prometheusMetricConnection
+type prometheusIstioResultConnection struct {
+	Metric prometheusIstioMetricConnection
 	Values []prometheusValuesConnection
 }
 
-type prometheusMetricConnection struct {
+type prometheusIstioMetricConnection struct {
 	Source_workload                string
 	Destination_workload           string
 	Destination_workload_namespace string
 	Namespace                      string
+}
+
+type prometheusLinkerdQueryResultConnection struct {
+	Status string
+	Data   prometheusLinkerdDataConnection
+}
+
+type prometheusLinkerdDataConnection struct {
+	ResultType string
+	Result     []prometheusLinkerdResultConnection
+}
+
+type prometheusLinkerdResultConnection struct {
+	Metric prometheusLinkerdMetricConnection
+	Values []prometheusValuesConnection
+}
+
+type prometheusLinkerdMetricConnection struct {
+	Namespace           string
+	Deployment          string
+	Dst_deployment 		string
+	Dst_namespace       string
 }
 
 type prometheusValuesConnection struct {

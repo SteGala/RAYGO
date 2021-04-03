@@ -119,7 +119,7 @@ func (p *ProfilingSystem) printInitialInformation() {
 func (p *ProfilingSystem) readEnvironmentVariables() {
 	secondsStr := os.Getenv("BACKGROUND_ROUTINE_UPDATE_TIME")
 	if nSec, err := strconv.Atoi(secondsStr); err != nil {
-		p.backgroundRoutineUpdateTime = 5
+		p.backgroundRoutineUpdateTime = 100
 	} else {
 		p.backgroundRoutineUpdateTime = nSec
 	}

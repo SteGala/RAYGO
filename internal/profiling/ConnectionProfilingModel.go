@@ -36,9 +36,9 @@ func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClie
 // This function is called every time there is a new pod scheduling request. The behaviour of the
 // function is the following:
 //  - checks if there are information of the current job in the connection graph
-//  - the informations in the connection graph may be out of date, so it checks if they are still valid
-//    (the informations are considered out of date if they're older than one day)
-//  - if the informations are still valid the prediction is computed, instead if the informetions are not present
+//  - the information in the connection graph may be out of date, so it checks if they are still valid
+//    (the information are considered out of date if they're older than one day)
+//  - if the information are still valid the prediction is computed, instead if the informetions are not present
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
 func (cp *ConnectionProfiling) ComputePrediction(podName string, podNamespace string, c chan string, schedulingTime time.Time) {

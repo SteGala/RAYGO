@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.io/Liqo/JobProfiler/internal/system"
 	"log"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -29,12 +30,22 @@ type connections struct {
 }
 
 func InitConnectionGraph(timeslots int) *ConnectionGraph {
-	return &ConnectionGraph{
-		jobs: populateFakeConnectionGraph(timeslots),
-		//jobs:      make(map[string]*connectionJob),
-		mutex:     sync.Mutex{},
-		timeslots: timeslots,
+	executionType := os.Getenv("EXECUTION_TYPE")
+	if executionType == "test" {
+		return &ConnectionGraph{
+			jobs: populateFakeConnectionGraph(timeslots),
+			mutex:     sync.Mutex{},
+			timeslots: timeslots,
+		}
+	} else {
+		return &ConnectionGraph{
+			jobs:      make(map[string]*connectionJob),
+			mutex:     sync.Mutex{},
+			timeslots: timeslots,
+		}
 	}
+
+
 }
 
 func (cg *ConnectionGraph) InsertNewJob(jobName string, jobNamespace string, records []system.ConnectionRecord, schedulingTime time.Time) {

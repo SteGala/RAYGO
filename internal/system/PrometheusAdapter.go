@@ -16,6 +16,7 @@ import (
 type PrometheusProvider struct {
 	URLService  string
 	PortService string
+	NetworkProvider string
 }
 
 type ResourceType int
@@ -49,34 +50,33 @@ type Job struct {
 
 func (p *PrometheusProvider) InitPrometheusSystem() error {
 
-	err := readEnvironmentVariable(p)
+	err := p.readEnvironmentVariable()
 
 	if err != nil {
 		return err
 	}
 
-	err = checkServiceAvailability(p)
+	err = p.checkServiceAvailability()
 
 	return err
 }
 
-func readEnvironmentVariable(p *PrometheusProvider) error {
+func (p *PrometheusProvider)readEnvironmentVariable() error {
 	p.URLService = os.Getenv("PROMETHEUS_URL")
-
 	if p.URLService == "" {
 		return errors.New("PROMETHEUS_URL environment variable not set")
 	}
 
 	p.PortService = os.Getenv("PROMETHEUS_PORT")
-
 	if p.PortService == "" {
 		return errors.New("PROMETHEUS_PORT environment variable not set")
 	}
 
+	p.NetworkProvider = os.Getenv("NETWORK_METRIC_PROVIDER")
 	return nil
 }
 
-func checkServiceAvailability(p *PrometheusProvider) error {
+func (p *PrometheusProvider)checkServiceAvailability() error {
 	resp, err := http.Get("http://" + p.URLService + ":" + p.PortService)
 
 	if err != nil {
@@ -93,12 +93,13 @@ func checkServiceAvailability(p *PrometheusProvider) error {
 }
 
 func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace string, requestType string, schedulingTime time.Time) ([]ConnectionRecord, error) {
-	var res prometheusQueryResultConnection
+	var res prometheusIstioQueryResultConnection
+	var res2 prometheusLinkerdQueryResultConnection
 
 	end := schedulingTime.Unix()
 	start := schedulingTime.Add(time.Minute * (-30)).Unix()
 
-	url := generateConnectionURL(p.URLService, p.PortService, jobName, namespace, requestType, start, end)
+	url := p.generateConnectionURL(jobName, namespace, requestType, start, end)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -112,34 +113,61 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 		return nil, err
 	}
 
-	err = json.Unmarshal(body, &res)
-	if err != nil {
-		return nil, err
+	if p.NetworkProvider == "istio" {
+		err = json.Unmarshal(body, &res)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err = json.Unmarshal(body, &res2)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	records := make([]ConnectionRecord, 0, 100)
 
-	for _, pd := range res.Data.Result {
+	if p.NetworkProvider == "istio" {
+		for _, pd := range res.Data.Result {
+			for _, m := range pd.Values {
+				var record ConnectionRecord
 
-		for _, m := range pd.Values {
-			var record ConnectionRecord
+				record.From = pd.Metric.Source_workload
+				record.To = pd.Metric.Destination_workload
+				record.DstNamespace = pd.Metric.Destination_workload_namespace
 
-			record.From = pd.Metric.Source_workload
-			record.To = pd.Metric.Destination_workload
-			record.DstNamespace = pd.Metric.Destination_workload_namespace
+				val, err := strconv.Atoi(strings.Split(m.Value, ".")[0])
+				if err != nil {
+					return nil, err
+				}
 
-			val, err := strconv.Atoi(strings.Split(m.Value, ".")[0])
-			if err != nil {
-				return nil, err
+				record.Bandwidth = float64(val)
+				record.Date = time.Unix(int64(m.TimeStamp), 0)
+
+				records = append(records, record)
 			}
+		}
+	} else {
+		for _, pd := range res2.Data.Result {
+			for _, m := range pd.Values {
+				var record ConnectionRecord
 
-			record.Bandwidth = float64(val)
-			record.Date = time.Unix(int64(m.TimeStamp), 0)
+				record.From = pd.Metric.Deployment
+				record.To = pd.Metric.Dst_deployment
+				record.DstNamespace = pd.Metric.Dst_namespace
 
-			records = append(records, record)
+				val, err := strconv.Atoi(strings.Split(m.Value, ".")[0])
+				if err != nil {
+					return nil, err
+				}
+
+				record.Bandwidth = float64(val)
+				record.Date = time.Unix(int64(m.TimeStamp), 0)
+
+				records = append(records, record)
+			}
 		}
 	}
-
 	return records, nil
 }
 
@@ -407,20 +435,35 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 
 // sum by (pod, namespace) (label_replace(rate(container_cpu_cfs_throttled_seconds_total{}[1m]), "pod", "$1", "pod", "(.*)-.{5}"))
 
-func generateConnectionURL(ip string, port string, podName string, namespace string, requestType string, start int64, end int64) string {
-	return "http://" + ip + ":" + port +
-		"/api/v1/query_range?query=" +
-		"sum%20by(namespace%2C%20source_workload%2C%20destination_workload%2C%20destination_workload_namespace)%20(" +
-		"increase(istio_" + requestType + "_bytes_sum%7B" +
-		"namespace%3D%22" + namespace +
-		"%22%2C%20source_workload%3D%22" + podName +
-		"%22%2C%20destination_workload!%3D%22unknown" +
-		"%22%7D%5B1m%5D))" +
-		"&start=" + strconv.Itoa(int(start)) +
-		"&end=" + strconv.Itoa(int(end)) +
-		"&step=1"
+func (p *PrometheusProvider)generateConnectionURL(podName string, namespace string, requestType string, start int64, end int64) string {
+	if p.NetworkProvider == "istio" {
+		return "http://" + p.URLService + ":" + p.PortService +
+			"/api/v1/query_range?query=" +
+			"sum%20by(namespace%2C%20source_workload%2C%20destination_workload%2C%20destination_workload_namespace)%20(" +
+			"increase(istio_" + requestType + "_bytes_sum%7B" +
+			"namespace%3D%22" + namespace +
+			"%22%2C%20source_workload%3D%22" + podName +
+			"%22%2C%20destination_workload!%3D%22unknown" +
+			"%22%7D%5B1m%5D))" +
+			"&start=" + strconv.Itoa(int(start)) +
+			"&end=" + strconv.Itoa(int(end)) +
+			"&step=1"
+		// sum by(namespace, source_workload, destination_workload, destination_workload_namespace) (increase(istio_request_bytes_sum{namespace="default", source_workload="productpage-v1"}[1m]))
+	} else {
+		return "http://" + p.URLService + ":" + p.PortService +
+			"/api/v1/query_range?query=" +
+			"%09%09sum%20by%20(namespace%2C%20deployment%2C%20dst_deployment%2C%20dst_namespace)" +
+			"%20(request_total%7Bdirection%3D%22outbound%22%2C%20" +
+			"dst_deployment!%3D%22%22%2C%20namespace%3D%22" + namespace +
+			"%22%2C%20deployment%3D%22" + podName + "%22%7D)" +
+			"&start=" + strconv.Itoa(int(start)) +
+			"&end=" + strconv.Itoa(int(end)) +
+			"&step=1"
+		//sum by (namespace, deployment, dst_deployment, dst_namespace) (request_total{direction="outbound", dst_deployment!="", namespace="test-stefano"})
 
-	// sum by(namespace, source_workload, destination_workload, destination_workload_namespace) (increase(istio_request_bytes_sum{namespace="default", source_workload="productpage-v1"}[1m]))
+	}
+
+
 }
 
 func generateResourceURL(ip string, port string, podName string, namespace string, start int64, end int64, recordType ResourceType) string {
