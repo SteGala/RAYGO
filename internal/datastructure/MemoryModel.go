@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/Liqo/JobProfiler/internal/monitoring"
 	"math"
 	"sync"
 	"time"
+
+	"github.io/Liqo/JobProfiler/internal/monitoring"
 
 	"github.io/Liqo/JobProfiler/internal/system"
 )
@@ -57,7 +58,7 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 
 	peak := computeKPercentile(records, 100, mm.timeslots)
 
-	if countNonZeroRecords(records) > 120 {
+	if countNonZeroRecords(records) >= 0 {
 		job.memoryPrediction = peak
 		monitoring.ExposeMemoryProfiling(jobName, namespace, "exponenial", job.memoryPrediction[generateTimeslotIndex(time.Now(), mm.timeslots)])
 	} else {
@@ -65,22 +66,22 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 	}
 
 	/*
-	if c, found := mm.jobs[key]; found {
-		if c.memoryPrediction == nil {
-			mm.jobs[key] = &job
-		} else {
-			for i := 0; i < mm.timeslots; i++ {
-				if job.memoryPrediction != nil {
-					job.memoryPrediction[i] = c.memoryPrediction[i]*0.8 + job.memoryPrediction[i]*0.2
+		if c, found := mm.jobs[key]; found {
+			if c.memoryPrediction == nil {
+				mm.jobs[key] = &job
+			} else {
+				for i := 0; i < mm.timeslots; i++ {
+					if job.memoryPrediction != nil {
+						job.memoryPrediction[i] = c.memoryPrediction[i]*0.8 + job.memoryPrediction[i]*0.2
+					}
 				}
+				mm.jobs[key] = &job
 			}
+		} else {
 			mm.jobs[key] = &job
 		}
-	} else {
-		mm.jobs[key] = &job
-	}
 
-	 */
+	*/
 
 	mm.jobs[key] = &job
 }

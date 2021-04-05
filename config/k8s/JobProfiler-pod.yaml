@@ -13,11 +13,11 @@ spec:
       imagePullPolicy: Always
       env:
         - name: PROMETHEUS_URL
-          value: "prometheus-k8s.monitoring.svc"
+          value: "prometheus.linkerd-viz.svc"
         - name: PROMETHEUS_PORT
           value: "9090"
         - name: PROFILING_NAMESPACE
-          value: "test-stefano" #empty means all the namespaces
+          value: "emojivoto" #empty means all the namespaces
         - name: BACKGROUND_ROUTINE_UPDATE_TIME
           value: "150"
         - name: BACKGROUND_ROUTINE_ENABLED
@@ -57,19 +57,19 @@ spec:
   sessionAffinity: None
   type: ClusterIP
 ---
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  labels:
-    control-plane: controller-manager
-  name: profiler-metrics-monitor
-  namespace: profiling
-spec:
-  endpoints:
-    - path: /metrics
-      port: metrics
-      interval: 1s
-  selector:
-    matchLabels:
-      app: profiling
+#apiVersion: monitoring.coreos.com/v1
+#kind: ServiceMonitor
+#metadata:
+#  labels:
+#    control-plane: controller-manager
+#  name: profiler-metrics-monitor
+#  namespace: profiling
+#spec:
+#  endpoints:
+#    - path: /metrics
+#      port: metrics
+#      interval: 1s
+#  selector:
+#    matchLabels:
+#      app: profiling
 

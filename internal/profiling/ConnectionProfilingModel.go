@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"time"
+
 	v1 "github.io/Liqo/JobProfiler/api/v1"
 	graph2 "github.io/Liqo/JobProfiler/internal/datastructure"
 	"github.io/Liqo/JobProfiler/internal/system"
-	"log"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"time"
 )
 
 type ConnectionProfiling struct {
@@ -19,6 +20,13 @@ type ConnectionProfiling struct {
 	prometheus *system.PrometheusProvider
 	crdClient  client.Client
 }
+
+type ConnectionProfilingValue struct {
+	job   system.Job
+	label string
+}
+
+type ConnectionProfilingValues []ConnectionProfilingValue
 
 func (cp *ConnectionProfiling) Init(provider *system.PrometheusProvider, crdClient client.Client) {
 	cp.prometheus = provider
@@ -53,23 +61,38 @@ func (cp *ConnectionProfiling) ComputePrediction(podName string, podNamespace st
 		if lastUpdate.Before(validTime) {
 			// if last update is before the last valid date the record in the datastructure needs to be updated
 
-			go cp.updateConnectionGraph(podName, podNamespace, schedulingTime)
-			c <- "empty"
-			return
+			cp.updateConnectionGraph(podName, podNamespace, schedulingTime)
 		}
 
 	} else {
 		// means that the job is not yet present in the datastructure so it needs to be added
 
-		go cp.updateConnectionGraph(podName, podNamespace, schedulingTime)
-		c <- "empty"
-		return
+		cp.updateConnectionGraph(podName, podNamespace, schedulingTime)
 	}
 
 	podLabels := cp.createConnectionCRD(podName, podNamespace, schedulingTime)
 	c <- podLabels
 
 	return
+}
+
+func (cp *ConnectionProfiling) UpdatePrediction(jobs []system.Job, c chan ConnectionProfilingValues, profilingTime time.Time) {
+	result := make(ConnectionProfilingValues, 0, 5)
+
+	for _, job := range jobs {
+		cp.updateConnectionGraph(job.Name, job.Namespace, profilingTime)
+
+		labels := cp.createConnectionCRD(job.Name, job.Namespace, profilingTime)
+		c := ConnectionProfilingValue{
+			job:   job,
+			label: labels,
+		}
+
+		result = append(result, c)
+	}
+
+	c <- result
+
 }
 
 func (cp *ConnectionProfiling) createConnectionCRD(jobName string, jobNamespace string, schedulingTime time.Time) string {
@@ -137,6 +160,8 @@ func (cp *ConnectionProfiling) updateConnectionGraph(jobName string, jobNamespac
 	if records := mergeRecords(recordsRequest, recordsResponse); len(records) > 0 {
 		cp.graph.InsertNewJob(extractDeploymentFromPodName(jobName), jobNamespace, records, schedulingTime)
 	}
+
+	//cp.graph.InsertNewJob(extractDeploymentFromPodName(jobName), jobNamespace, recordsRequest, schedulingTime)
 }
 
 func (cp *ConnectionProfiling) GetJobConnections(job system.Job, time time.Time) ([]system.Job, error) {

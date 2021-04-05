@@ -205,8 +205,7 @@ func (p *ProfilingSystem) StartProfiling(namespace string) error {
 func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 	cpuChan := make(chan ResourceProfilingValues)
 	memChan := make(chan ResourceProfilingValues)
-
-	//time.Sleep(time.Duration(10) * time.Minute)
+	connChan := make(chan ConnectionProfilingValues)
 
 	for {
 		if job, err := p.memory.data.GetLastUpdatedJob(); err == nil {
@@ -217,14 +216,26 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 			if jobConnections, err := p.connection.GetJobConnections(job, profilingTime); err == nil {
 				go p.cpu.UpdatePrediction(jobConnections, cpuChan, profilingTime)
 				go p.memory.UpdatePrediction(jobConnections, memChan, profilingTime)
+				go p.connection.UpdatePrediction(jobConnections, connChan, profilingTime)
 
 				memValues := <-memChan
 				cpuValues := <-cpuChan
+				connValues = <-connChan
 
-				if len(memValues) == len(cpuValues) {
-					for i := 0; i < len(memValues); i++ {
-						if err := p.updateDeploymentSpec(memValues[i].job, memValues[i], cpuValues[i], Background); err != nil {
-							log.Print(err)
+				if p.enableDeploymentUpdate == true {
+					if len(memValues) == len(cpuValues) {
+						for i := 0; i < len(memValues); i++ {
+							if err := p.updateDeploymentSpec(memValues[i].job, memValues[i], cpuValues[i], Background); err != nil {
+								log.Print(err)
+							}
+						}
+					}
+				} else {
+					if len(memValues) == len(cpuValues) && len(memValues) == len(connValues) {
+						for i := 0; i < len(memValues); i++ {
+							if err := p.updateDeploymentSpec(memValues[i].job, memValues[i], cpuValues[i], Background); err != nil {
+								log.Print(err)
+							}
 						}
 					}
 				}

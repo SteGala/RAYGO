@@ -14,8 +14,8 @@ import (
 )
 
 type PrometheusProvider struct {
-	URLService  string
-	PortService string
+	URLService      string
+	PortService     string
 	NetworkProvider string
 }
 
@@ -61,7 +61,7 @@ func (p *PrometheusProvider) InitPrometheusSystem() error {
 	return err
 }
 
-func (p *PrometheusProvider)readEnvironmentVariable() error {
+func (p *PrometheusProvider) readEnvironmentVariable() error {
 	p.URLService = os.Getenv("PROMETHEUS_URL")
 	if p.URLService == "" {
 		return errors.New("PROMETHEUS_URL environment variable not set")
@@ -76,7 +76,7 @@ func (p *PrometheusProvider)readEnvironmentVariable() error {
 	return nil
 }
 
-func (p *PrometheusProvider)checkServiceAvailability() error {
+func (p *PrometheusProvider) checkServiceAvailability() error {
 	resp, err := http.Get("http://" + p.URLService + ":" + p.PortService)
 
 	if err != nil {
@@ -263,7 +263,6 @@ func (p *PrometheusProvider) GetCPUThrottlingRecords(jobs []Job) ([]ResourceReco
 	start := time.Now().Add(time.Minute * (-10)).Unix()
 
 	url := generateCPUThrottleURL(p.URLService, p.PortService, jobs, start, end)
-	//log.Print(url)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -322,7 +321,6 @@ func (p *PrometheusProvider) GetMemoryFailRecords(jobs []Job) ([]ResourceRecord,
 	start := time.Now().Add(time.Minute * (-10)).Unix()
 
 	url := generateMemoryFailURL(p.URLService, p.PortService, jobs, start, end)
-	//log.Print(url)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -435,7 +433,7 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 
 // sum by (pod, namespace) (label_replace(rate(container_cpu_cfs_throttled_seconds_total{}[1m]), "pod", "$1", "pod", "(.*)-.{5}"))
 
-func (p *PrometheusProvider)generateConnectionURL(podName string, namespace string, requestType string, start int64, end int64) string {
+func (p *PrometheusProvider) generateConnectionURL(podName string, namespace string, requestType string, start int64, end int64) string {
 	if p.NetworkProvider == "istio" {
 		return "http://" + p.URLService + ":" + p.PortService +
 			"/api/v1/query_range?query=" +
@@ -452,17 +450,16 @@ func (p *PrometheusProvider)generateConnectionURL(podName string, namespace stri
 	} else {
 		return "http://" + p.URLService + ":" + p.PortService +
 			"/api/v1/query_range?query=" +
-			"%09%09sum%20by%20(namespace%2C%20deployment%2C%20dst_deployment%2C%20dst_namespace)" +
-			"%20(request_total%7Bdirection%3D%22outbound%22%2C%20" +
+			"sum%20by%20(namespace%2C%20deployment%2C%20dst_deployment%2C%20dst_namespace)" +
+			"%20(increase(" + requestType + "_total%7Bdirection%3D%22outbound%22%2C%20" +
 			"dst_deployment!%3D%22%22%2C%20namespace%3D%22" + namespace +
-			"%22%2C%20deployment%3D%22" + podName + "%22%7D)" +
+			"%22%2C%20deployment%3D%22" + podName + "%22%7D%5B1m%5D))" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
 			"&step=1"
 		//sum by (namespace, deployment, dst_deployment, dst_namespace) (request_total{direction="outbound", dst_deployment!="", namespace="test-stefano"})
 
 	}
-
 
 }
 

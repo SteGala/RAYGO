@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/Liqo/JobProfiler/internal/monitoring"
 	"math"
 	"sync"
 	"time"
+
+	"github.io/Liqo/JobProfiler/internal/monitoring"
 
 	"github.io/Liqo/JobProfiler/internal/system"
 )
@@ -58,7 +59,7 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 	//peak := computePeakSignal(records, cp.timeslots)
 	percentile := computeKPercentile(records, 98, cp.timeslots)
 
-	if countNonZeroRecords(records) > 120 {
+	if countNonZeroRecords(records) >= 0 {
 		job.cpuPrediction = percentile
 		monitoring.ExposeCPUProfiling(jobName, namespace, "exponential", job.cpuPrediction[generateTimeslotIndex(time.Now(), cp.timeslots)])
 	} else {
@@ -66,22 +67,22 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 	}
 
 	/*
-	if c, found := cp.jobs[key]; found {
-		if c.cpuPrediction == nil {
-			cp.jobs[key] = &job
-		} else {
-			for i := 0; i < cp.timeslots; i++ {
-				if job.cpuPrediction != nil {
-					job.cpuPrediction[i] = c.cpuPrediction[i]*0.8 + job.cpuPrediction[i]*0.2
+		if c, found := cp.jobs[key]; found {
+			if c.cpuPrediction == nil {
+				cp.jobs[key] = &job
+			} else {
+				for i := 0; i < cp.timeslots; i++ {
+					if job.cpuPrediction != nil {
+						job.cpuPrediction[i] = c.cpuPrediction[i]*0.8 + job.cpuPrediction[i]*0.2
+					}
 				}
+				cp.jobs[key] = &job
 			}
+		} else {
 			cp.jobs[key] = &job
 		}
-	} else {
-		cp.jobs[key] = &job
-	}
 
-	 */
+	*/
 
 	cp.jobs[key] = &job
 }

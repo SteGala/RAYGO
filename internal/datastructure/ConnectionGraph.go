@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.io/Liqo/JobProfiler/internal/system"
 	"log"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.io/Liqo/JobProfiler/internal/system"
 )
 
 type ConnectionGraph struct {
@@ -33,7 +34,7 @@ func InitConnectionGraph(timeslots int) *ConnectionGraph {
 	executionType := os.Getenv("EXECUTION_TYPE")
 	if executionType == "test" {
 		return &ConnectionGraph{
-			jobs: populateFakeConnectionGraph(timeslots),
+			jobs:      populateFakeConnectionGraph(timeslots),
 			mutex:     sync.Mutex{},
 			timeslots: timeslots,
 		}
@@ -44,7 +45,6 @@ func InitConnectionGraph(timeslots int) *ConnectionGraph {
 			timeslots: timeslots,
 		}
 	}
-
 
 }
 
@@ -88,20 +88,10 @@ func (cg *ConnectionGraph) InsertNewJob(jobName string, jobNamespace string, rec
 			}
 		}
 
-		if numRecords[0] != 0 {
-			finalPrediction[0] = finalPrediction[0] / float64(numRecords[0])
-		}
-
-		if numRecords[1] != 0 {
-			finalPrediction[1] = finalPrediction[1] / float64(numRecords[1])
-		}
-
-		if numRecords[2] != 0 {
-			finalPrediction[2] = finalPrediction[2] / float64(numRecords[2])
-		}
-
-		if numRecords[3] != 0 {
-			finalPrediction[3] = finalPrediction[3] / float64(numRecords[3])
+		for i := 0; i < cg.timeslots; i++ {
+			if numRecords[i] != 0 {
+				finalPrediction[i] = finalPrediction[i] / float64(numRecords[i])
+			}
 		}
 
 		// if the connected job is not yet in the model we create it
