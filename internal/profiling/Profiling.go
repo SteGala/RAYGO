@@ -220,18 +220,10 @@ func (p *ProfilingSystem) ProfilingBackgroundUpdate() {
 
 				memValues := <-memChan
 				cpuValues := <-cpuChan
-				connValues = <-connChan
+				_ = <-connChan
 
 				if p.enableDeploymentUpdate == true {
 					if len(memValues) == len(cpuValues) {
-						for i := 0; i < len(memValues); i++ {
-							if err := p.updateDeploymentSpec(memValues[i].job, memValues[i], cpuValues[i], Background); err != nil {
-								log.Print(err)
-							}
-						}
-					}
-				} else {
-					if len(memValues) == len(cpuValues) && len(memValues) == len(connValues) {
 						for i := 0; i < len(memValues); i++ {
 							if err := p.updateDeploymentSpec(memValues[i].job, memValues[i], cpuValues[i], Background); err != nil {
 								log.Print(err)
