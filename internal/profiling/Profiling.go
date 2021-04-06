@@ -264,6 +264,7 @@ func (p *ProfilingSystem) addPodLabels(connectionLabels string, memoryLabel Reso
 	// ((NEED TO IMPROVE!!))
 	// ------------------------------------------------------------------------------
 
+	log.Println(connectionLabels)
 	// add labels for connections
 	if connectionLabels != "empty" {
 		addLabel = true
