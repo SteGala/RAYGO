@@ -9,17 +9,17 @@ spec:
   restartPolicy: Never
   containers:
     - name: job-profiler
-      image: stegala/job-profiler
+      image: stegala/job-profiler:test
       imagePullPolicy: Always
       env:
         - name: PROMETHEUS_URL
-          value: "prometheus.linkerd-viz.svc"
+          value: "prometheus-k8s.monitoring.svc"
         - name: PROMETHEUS_PORT
           value: "9090"
         - name: PROFILING_NAMESPACE
-          value: "emojivoto" #empty means all the namespaces
+          value: "test-stefano" #empty means all the namespaces
         - name: BACKGROUND_ROUTINE_UPDATE_TIME
-          value: "150"
+          value: "120"
         - name: BACKGROUND_ROUTINE_ENABLED
           value: "TRUE"
         - name: TIMESLOTS
@@ -33,9 +33,9 @@ spec:
         - name: MEMORY_LOWER_THRESHOLD
           value: "50.0"
         - name: OPERATING_MODE
-          value: "PROFILING" # accepted values are: PROFILING, PROFILING_SCHEDULING. PROFILING is the default
-        #- name: EXECUTION_TYPE
-        #  value: "test"
+          value: "PROFILING_SCHEDULING" # accepted values are: PROFILING, PROFILING_SCHEDULING. PROFILING is the default
+        - name: EXECUTION_TYPE
+          value: "test"
         - name: NETWORK_METRIC_PROVIDER
           value: "linkerd" # accepted values are istio, linkerd
 ---

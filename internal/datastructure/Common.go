@@ -149,8 +149,8 @@ func computeResourceIncrease(value float64, avg float64) float64 {
 
 	increase := 0.1 * math.Exp(x/3.0)
 
-	if increase > 1 {
-		increase = 1
+	if increase > 0.5 {
+		increase = 0.5
 	}
 
 	return increase
