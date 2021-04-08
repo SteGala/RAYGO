@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"sync"
@@ -224,8 +223,8 @@ func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string, time tim
 			Name:      jobName + "-xxxxxxxx-xxxxx",
 			Namespace: jobNamespace,
 		})
-		log.Print(cg.jobs)
-		log.Print(generateMapKey(jobName, jobNamespace))
+		//log.Print(cg.jobs)
+		//log.Print(generateMapKey(jobName, jobNamespace))
 		return result, nil
 	} else {
 		cg.mutex.Lock()

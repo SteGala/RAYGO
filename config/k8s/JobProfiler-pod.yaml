@@ -19,7 +19,7 @@ spec:
         - name: PROFILING_NAMESPACE
           value: "test-stefano" #empty means all the namespaces
         - name: BACKGROUND_ROUTINE_UPDATE_TIME
-          value: "120"
+          value: "15"
         - name: BACKGROUND_ROUTINE_ENABLED
           value: "TRUE"
         - name: TIMESLOTS
@@ -34,8 +34,8 @@ spec:
           value: "50.0"
         - name: OPERATING_MODE
           value: "PROFILING_SCHEDULING" # accepted values are: PROFILING, PROFILING_SCHEDULING. PROFILING is the default
-        - name: EXECUTION_TYPE
-          value: "test"
+        #- name: EXECUTION_TYPE
+        #  value: "test"
         - name: NETWORK_METRIC_PROVIDER
           value: "linkerd" # accepted values are istio, linkerd
 ---
@@ -57,19 +57,19 @@ spec:
   sessionAffinity: None
   type: ClusterIP
 ---
-#apiVersion: monitoring.coreos.com/v1
-#kind: ServiceMonitor
-#metadata:
-#  labels:
-#    control-plane: controller-manager
-#  name: profiler-metrics-monitor
-#  namespace: profiling
-#spec:
-#  endpoints:
-#    - path: /metrics
-#      port: metrics
-#      interval: 1s
-#  selector:
-#    matchLabels:
-#      app: profiling
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: profiler-metrics-monitor
+  namespace: profiling
+spec:
+  endpoints:
+    - path: /metrics
+      port: metrics
+      interval: 1s
+  selector:
+    matchLabels:
+      app: profiling
 
