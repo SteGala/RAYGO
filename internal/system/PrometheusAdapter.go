@@ -99,6 +99,16 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 	end := schedulingTime.Unix()
 	start := schedulingTime.Add(time.Minute * (-30)).Unix()
 
+	if requestType == "request" {
+		if p.NetworkProvider == "linkerd" {
+			requestType = "write"
+		}
+	} else if requestType == "response" {
+		if p.NetworkProvider == "linkerd" {
+			requestType = "read"
+		}
+	}
+
 	url := p.generateConnectionURL(jobName, namespace, requestType, start, end)
 
 	resp, err := http.Get(url)
@@ -450,15 +460,13 @@ func (p *PrometheusProvider) generateConnectionURL(podName string, namespace str
 	} else {
 		return "http://" + p.URLService + ":" + p.PortService +
 			"/api/v1/query_range?query=" +
-			"sum%20by%20(namespace%2C%20deployment%2C%20dst_deployment%2C%20dst_namespace)" +
-			"%20(increase(" + requestType + "_total%7Bdirection%3D%22outbound%22%2C%20" +
-			"dst_deployment!%3D%22%22%2C%20namespace%3D%22" + namespace +
-			"%22%2C%20deployment%3D%22" + podName + "%22%7D%5B1m%5D))" +
+			"sum%20by(namespace%2C%20deployment%2C%20dst_deployment%2C%20dst_namespace)" +
+			"%20(rate(tcp_" + requestType + "_bytes_total%7Bnamespace%3D%22" + namespace +
+			"%22%2C%20direction%3D%22outbound%22%2C%20dst_deployment!%3D%22%22%2C%20deployment%3D%22" + podName + "%22%7D%5B30s%5D))" +
 			"&start=" + strconv.Itoa(int(start)) +
 			"&end=" + strconv.Itoa(int(end)) +
 			"&step=1"
-		//sum by (namespace, deployment, dst_deployment, dst_namespace) (request_total{direction="outbound", dst_deployment!="", namespace="test-stefano"})
-
+		//sum by(namespace, deployment, dst_deployment, dst_namespace) (rate(tcp_write_bytes_total{namespace="default", direction="outbound", dst_deployment!=""}[30s]))
 	}
 
 }
