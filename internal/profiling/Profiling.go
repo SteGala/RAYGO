@@ -356,8 +356,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	// add label for cpu
 	if cpuLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
-			// increase by 10% for safety margin
-			s += s * 0.085
+			// increase by 15% for safety margin
+			s += s * 0.15
 
 			//set some lower bounds
 			if s < 0.02 {
@@ -365,11 +365,11 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			}
 
 			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
-			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", 1.7*s))
+			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", 1.65*s))
 			cpuRLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.15))
 			cpuRUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.15))
-			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 1.7*s-1.7*s*0.15))
-			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 1.7*s+1.7*s*0.15))
+			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 1.65*s-1.65*s*0.15))
+			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 1.65*s+1.65*s*0.15))
 		}
 	} else {
 		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort resource/limits update")

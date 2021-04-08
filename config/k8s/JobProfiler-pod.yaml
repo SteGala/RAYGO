@@ -19,7 +19,7 @@ spec:
         - name: PROFILING_NAMESPACE
           value: "test-stefano" #empty means all the namespaces
         - name: BACKGROUND_ROUTINE_UPDATE_TIME
-          value: "15"
+          value: "10"
         - name: BACKGROUND_ROUTINE_ENABLED
           value: "TRUE"
         - name: TIMESLOTS

@@ -57,7 +57,7 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 	computeCPUWeightedSignal(records, cp.timeslots)
 
 	//peak := computePeakSignal(records, cp.timeslots)
-	percentile := computeKPercentile(records, 98, cp.timeslots)
+	percentile := computeKPercentile(records, 97, cp.timeslots)
 
 	if countNonZeroRecords(records) >= 300 {
 		job.cpuPrediction = percentile
