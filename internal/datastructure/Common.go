@@ -147,10 +147,10 @@ func generateTimeslotIndex(date time.Time, nTimeslots int) int {
 func computeResourceIncrease(value float64, avg float64) float64 {
 	x := value / avg
 
-	increase := 0.05 * math.Exp(x/2.0)
+	increase := 0.1 * math.Exp(x/2.0)
 
-	if increase > 0.3 {
-		increase = 0.3
+	if increase > 0.6 {
+		increase = 0.6
 	}
 
 	return increase
@@ -158,15 +158,15 @@ func computeResourceIncrease(value float64, avg float64) float64 {
 
 func computeResourceDecrease(value float64, avg float64) float64 {
 	if value <= 0 {
-		return 0.5
+		return 0.4
 	}
 
 	x := avg / value
 
 	decrease := 0.05 * math.Exp(x/2.0)
 
-	if decrease > 0.3 {
-		decrease = 0.3
+	if decrease > 0.4 {
+		decrease = 0.4
 	}
 
 	return decrease

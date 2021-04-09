@@ -357,11 +357,11 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	if cpuLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
 			// increase by 10% for safety margin
-			s += s * 0.1
+			s += s * 0.3
 
 			//set some lower bounds
-			if s < 0.02 {
-				s = 0.02
+			if s < 0.03 {
+				s = 0.03
 			}
 
 			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
