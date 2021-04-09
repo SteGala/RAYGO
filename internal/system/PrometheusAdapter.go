@@ -236,7 +236,7 @@ func (p *PrometheusProvider) GetResourceRecords(jobName string, namespace string
 		}
 
 		if currDate != end {
-			for ; currDate <= end; currDate += 60 {
+			for ; currDate <= end; currDate += 1 {
 				record.Value = 0
 				record.Date = time.Unix(currDate, 0)
 

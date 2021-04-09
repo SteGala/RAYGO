@@ -356,8 +356,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	// add label for cpu
 	if cpuLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
-			// increase by 15% for safety margin
-			s += s * 0.15
+			// increase by 10% for safety margin
+			s += s * 0.1
 
 			//set some lower bounds
 			if s < 0.02 {
