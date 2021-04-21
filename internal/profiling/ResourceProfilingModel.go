@@ -77,7 +77,7 @@ func (rp *ResourceProfiling) Init(provider *system.PrometheusProvider, crdClient
 // function is the following:
 //  - checks if there are information of the current job in the connection graph
 //  - the informations in the connection graph may be out of date, so it checks if they are still valid
-//    (the informations are considered out of date if they're older than one day)
+//    (the informations are considered out of date if they are older than one day)
 //  - if the informations are still valid the prediction is computed, instead if the informetions are not present
 //    or if they are out of date an update routine is triggered and the function returns. Next time the function
 //    will be called for the same pod the informations will be ready
@@ -121,7 +121,6 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 
 	prediction, err := rp.data.GetJobPrediction(extractDeploymentFromPodName(podName), podNamespace, schedulingTime)
 	if err != nil {
-		//log.Print(err)
 		c <- ResourceProfilingValue{
 			resourceType: system.None,
 			value:        "",
@@ -135,12 +134,20 @@ func (rp *ResourceProfiling) ComputePrediction(podName string, podNamespace stri
 	switch rp.data.(type) {
 	case *datastructure.MemoryModel:
 		c <- ResourceProfilingValue{
+			job: system.Job{
+				Name: podName,
+				Namespace: podNamespace,
+			},
 			resourceType: system.Memory,
 			value:        prediction,
 			label:        podLabel,
 		}
 	case *datastructure.CPUModel:
 		c <- ResourceProfilingValue{
+			job: system.Job{
+				Name: podName,
+				Namespace: podNamespace,
+			},
 			resourceType: system.CPU,
 			value:        prediction,
 			label:        podLabel,
@@ -212,6 +219,7 @@ func (rp *ResourceProfiling) createResourceCRD(jobName string, jobNamespace stri
 		memSpec := v1.MemorySpec{
 			UpdateTime: currTime.String(),
 			Value:      prediction,
+			JobName: 	extractDeploymentFromPodName(jobName),
 		}
 
 		crdName = "memprofile-" + generateResourceCRDName(extractDeploymentFromPodName(jobName), jobNamespace)
@@ -231,6 +239,7 @@ func (rp *ResourceProfiling) createResourceCRD(jobName string, jobNamespace stri
 		cpuSpec := v1.CPUSpec{
 			UpdateTime: currTime.String(),
 			Value:      prediction,
+			JobName: 	extractDeploymentFromPodName(jobName),
 		}
 
 		crdName = "cpuprofile-" + generateResourceCRDName(extractDeploymentFromPodName(jobName), jobNamespace)

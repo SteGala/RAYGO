@@ -34,6 +34,7 @@ type MemoryProfileSpec struct {
 
 type MemorySpec struct {
 	UpdateTime string `json:"updateTime"`
+	JobName    string `json:"jobName"`
 	Value      string `json:"value"`
 }
 

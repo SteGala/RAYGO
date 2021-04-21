@@ -38,11 +38,14 @@ spec:
               description: Foo is an example field of MemoryProfile. Edit MemoryProfile_types.go
                 to remove/update
               properties:
+                jobName:
+                  type: string
                 updateTime:
                   type: string
                 value:
                   type: string
               required:
+              - jobName
               - updateTime
               - value
               type: object

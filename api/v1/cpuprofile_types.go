@@ -34,6 +34,7 @@ type CPUProfileSpec struct {
 
 type CPUSpec struct {
 	UpdateTime string `json:"updateTime"`
+	JobName    string `json:"jobName"`
 	Value      string `json:"value"`
 }
 

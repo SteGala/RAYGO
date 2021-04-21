@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"sync"
@@ -208,7 +207,7 @@ func (cg *ConnectionGraph) GetJobConnections(jobName string, jobNamespace string
 	defer cg.mutex.Unlock()
 
 	if job, found := cg.jobs[generateMapKey(jobName, jobNamespace)]; !found {
-		return nil, errors.New("Job " + jobName + " is not yet present in the model")
+		return nil, errors.New("Job " + jobName + " is not yet present in the connection model")
 	} else {
 		id := generateTimeslotIndex(schedulingTime, cg.timeslots)
 		return job.connectedJobs[id], nil
@@ -224,8 +223,7 @@ func (cg *ConnectionGraph) FindSCC(jobName string, jobNamespace string, time tim
 			Name:      jobName + "-xxxxxxxx-xxxxx",
 			Namespace: jobNamespace,
 		})
-		log.Print(cg.jobs)
-		log.Print(generateMapKey(jobName, jobNamespace))
+
 		return result, nil
 	} else {
 		cg.mutex.Lock()
