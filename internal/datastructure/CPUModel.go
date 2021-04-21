@@ -54,6 +54,7 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 		lastUpdate:    schedulingTime,
 	}
 
+	
 	computeCPUWeightedSignal(records, cp.timeslots)
 
 	//peak := computePeakSignal(records, cp.timeslots)
