@@ -171,7 +171,7 @@ func (p *PrometheusProvider) GetConnectionRecords(jobName string, namespace stri
 					return nil, err
 				}
 
-				record.Bandwidth = float64(val)
+				record.Bandwidth = float64(val * 8)
 				record.Date = time.Unix(int64(m.TimeStamp), 0)
 
 				records = append(records, record)
