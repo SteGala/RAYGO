@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
+
+	//"log"
 	"math"
+	//"strconv"
 	"sync"
 	"time"
 
@@ -59,7 +63,7 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 
 	//peak := computePeakSignal(records, cp.timeslots)
 	percentile := computeKPercentile(records, 98, cp.timeslots)
-	monitoring.ExposeCPUProfiling(jobName, namespace, "exponential", percentile[generateTimeslotIndex(time.Now(), cp.timeslots)] / 1000)
+	monitoring.ExposeCPUProfiling(jobName, namespace, "exponential", percentile[generateTimeslotIndex(time.Now(), cp.timeslots)])
 
 	if countNonZeroRecords(records) >= 1500 {
 		job.cpuPrediction = percentile
@@ -131,7 +135,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeCPUCorrectionConstant(i int, timeslots int) float64 {
-	decayTime := 800 / timeslots
+	decayTime := 850 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
@@ -247,11 +251,13 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 		if found && t.linearPrediction > maxThreshold && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * computeResourceIncrease(t.linearPrediction, maxThreshold)
+			log.Print("Increasing CPU for pod " + cp.jobs[key].jobInformation.Name + " of " + fmt.Sprintf("%f", computeResourceIncrease(t.linearPrediction, minThreshold)))
 		}
 
 		if found && t.linearPrediction < minThreshold && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * computeResourceDecrease(t.linearPrediction, minThreshold)
+			log.Print("Reducing CPU for pod " + cp.jobs[key].jobInformation.Name + " of " + fmt.Sprintf("%f", computeResourceDecrease(t.linearPrediction, minThreshold)))
 		}
 
 		if found {

@@ -158,15 +158,15 @@ func computeResourceIncrease(value float64, avg float64) float64 {
 
 func computeResourceDecrease(value float64, avg float64) float64 {
 	if value <= 0 {
-		return 0.4
+		return 0.3
 	}
 
 	x := avg / value
 
 	decrease := 0.05 * math.Exp(x/2.0)
 
-	if decrease > 0.4 {
-		decrease = 0.4
+	if decrease > 0.3 {
+		decrease = 0.3
 	}
 
 	return decrease

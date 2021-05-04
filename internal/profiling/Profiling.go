@@ -350,14 +350,14 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 1.65*s) + "Mi")
 		}
 	} else {
-		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort resource/limits update")
+		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort requests/limits update")
 	}
 
 	// add label for cpu
 	if cpuLabel.resourceType != system.None {
 		if s, err := strconv.ParseFloat(cpuLabel.value, 64); err == nil {
 			// increase by 10% for safety margin
-			s += s * 0.3
+			s += s * 0.35
 
 			//set some lower bounds
 			if s < 0.03 {
@@ -372,7 +372,7 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 1.7*s+1.7*s*0.15))
 		}
 	} else {
-		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort resource/limits update")
+		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort requests/limits update")
 	}
 
 	p.clientMutex.Lock()
