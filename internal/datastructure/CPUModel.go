@@ -62,7 +62,7 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 	computeCPUWeightedSignal(records, cp.timeslots)
 
 	//peak := computePeakSignal(records, cp.timeslots)
-	percentile := computeKPercentile(records, 98, cp.timeslots)
+	percentile := computeKPercentile(records, 97, cp.timeslots)
 	monitoring.ExposeCPUProfiling(jobName, namespace, "exponential", percentile[generateTimeslotIndex(time.Now(), cp.timeslots)])
 
 	if countNonZeroRecords(records) >= 1500 {
@@ -245,8 +245,8 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 
 		_, found := cp.jobs[key]
 
-		maxThreshold := t.avgThrottling + t.avgThrottling*0.25
-		minThreshold := t.avgThrottling - t.avgThrottling*0.25
+		maxThreshold := t.avgThrottling + t.avgThrottling*0.2
+		minThreshold := t.avgThrottling - t.avgThrottling*0.2
 
 		if found && t.linearPrediction > maxThreshold && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
 			id := generateTimeslotIndex(currTime, cp.timeslots)

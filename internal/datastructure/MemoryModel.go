@@ -246,8 +246,8 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 
 		//log.Printf("MEM\tPod: %s\tFail: %.3f Prediction: %.3f", t.podName, t.avgFail, t.linearPrediction)
 
-		maxThreshold := t.avgFail + t.avgFail*0.25
-		minThreshold := t.avgFail - t.avgFail*0.25
+		maxThreshold := t.avgFail + t.avgFail*0.2
+		minThreshold := t.avgFail - t.avgFail*0.2
 
 		if found && t.linearPrediction > maxThreshold && t.avgFail > mm.memoryFailLowerThreshold && mm.jobs[key].memoryPrediction != nil {
 			id := generateTimeslotIndex(currTime, mm.timeslots)
