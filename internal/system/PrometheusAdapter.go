@@ -260,7 +260,7 @@ func (p *PrometheusProvider) GetCPUThrottlingRecords(jobs []Job) ([]ResourceReco
 	}
 
 	end := time.Now().Unix()
-	start := time.Now().Add(time.Second * (-150)).Unix()
+	start := time.Now().Add(time.Second * (-120)).Unix()
 
 	url := generateCPUThrottleURL(p.URLService, p.PortService, jobs, start, end)
 
@@ -318,7 +318,7 @@ func (p *PrometheusProvider) GetMemoryFailRecords(jobs []Job) ([]ResourceRecord,
 	}
 
 	end := time.Now().Unix()
-	start := time.Now().Add(time.Second * (-150)).Unix()
+	start := time.Now().Add(time.Second * (-120)).Unix()
 
 	url := generateMemoryFailURL(p.URLService, p.PortService, jobs, start, end)
 
