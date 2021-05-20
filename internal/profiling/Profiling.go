@@ -25,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	appsv1 "k8s.io/api/apps/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -347,7 +348,7 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			}
 
 			podRequest["memory"] = resource.MustParse(fmt.Sprintf("%.0f", s) + "Mi")
-			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 1.65*s) + "Mi")
+			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 1.7*s) + "Mi")
 		}
 	} else {
 		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort requests/limits update")
@@ -366,10 +367,10 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 
 			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
 			podLimit["cpu"] = resource.MustParse(fmt.Sprintf("%f", 1.7*s))
-			cpuRLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.2))
-			cpuRUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.2))
-			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 1.7*s-1.7*s*0.2))
-			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 1.7*s+1.7*s*0.2))
+			cpuRLow = resource.MustParse(fmt.Sprintf("%f", s-s*0.25))
+			cpuRUp = resource.MustParse(fmt.Sprintf("%f", s+s*0.25))
+			cpuLLow = resource.MustParse(fmt.Sprintf("%f", 1.7*s-1.7*s*0.25))
+			cpuLUp = resource.MustParse(fmt.Sprintf("%f", 1.7*s+1.7*s*0.25))
 		}
 	} else {
 		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort requests/limits update")
@@ -391,19 +392,20 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 					return err
 				}
 
-				if d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() > int64(float64(memRequest.Value())+0.2*float64(memRequest.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() < int64(float64(memRequest.Value())-0.2*float64(memRequest.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() > int64(float64(memLimit.Value())+0.2*float64(memLimit.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() < int64(float64(memLimit.Value())-0.2*float64(memLimit.Value())) ||
-					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRLow) < 0 ||
-					d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRUp) > 0 ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLLow) < 0 ||
-					d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLUp) > 0 {
-
+				if updateNeeded, increase := checkNeedForUpdate(d, memRequest, memLimit, cpuRLow, cpuRUp, cpuLLow, cpuLUp); updateNeeded {
+					
 					if update == Scheduling {
-						log.Print("Scheduling  -->  patch " + d.Name)
+						if increase {
+							log.Print("Scheduling  -->  patch, increase " + d.Name)
+						} else {
+							log.Print("Scheduling  -->  patch, decrease " + d.Name)
+						}
 					} else if update == Background {
-						log.Print("Background  -->  patch " + d.Name)
+						if increase {
+							log.Print("Background  -->  patch, increase " + d.Name)
+						} else {
+							log.Print("Background  -->  patch, decrease " + d.Name)
+						}
 					}
 
 					d.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
@@ -449,6 +451,27 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 	}
 
 	return nil
+}
+
+
+func checkNeedForUpdate(d appsv1.Deployment, memRequest resource.Quantity, memLimit resource.Quantity, cpuRLow resource.Quantity, cpuRUp resource.Quantity, cpuLLow resource.Quantity, cpuLUp resource.Quantity) (bool, bool) {
+	// check if resources need to be decreased
+	if d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() > int64(float64(memRequest.Value())+0.25*float64(memRequest.Value())) ||
+	d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() > int64(float64(memLimit.Value())+0.25*float64(memLimit.Value())) ||
+	d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRUp) > 0 ||
+	d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLUp) > 0 {
+		return true, false
+	}
+
+	// check if resources need to be increased
+	if d.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Value() < int64(float64(memRequest.Value())-0.25*float64(memRequest.Value())) ||
+	d.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Value() < int64(float64(memLimit.Value())-0.25*float64(memLimit.Value())) ||
+	d.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(cpuRLow) < 0 ||
+	d.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(cpuLLow) < 0 {
+		return true, true
+	}
+
+	return false, false
 }
 
 // This function:

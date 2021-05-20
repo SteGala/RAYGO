@@ -29,7 +29,7 @@ spec:
         - name: MEMORY_THRESHOLD
           value: "600.0"
         - name: CPU_LOWER_THRESHOLD
-          value: "0.05"
+          value: "0.15"
         - name: MEMORY_LOWER_THRESHOLD
           value: "50.0"
         - name: OPERATING_MODE

@@ -158,7 +158,7 @@ func computeResourceIncrease(value float64, avg float64) float64 {
 
 func computeResourceDecrease(value float64, avg float64) float64 {
 	if value <= 0 {
-		return 0.25
+		return 0.15
 	}
 
 	x := avg / value
