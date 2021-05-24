@@ -407,8 +407,8 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 		if id != len(jobs)-1 {
 			differentNamespaces.WriteString("%7C")
 		} else {
-			//differentNamespaces.WriteString("%22%2C%20")
-			differentNamespaces.WriteString("%22%2C")
+			differentNamespaces.WriteString("%22%2C%20")
+			//differentNamespaces.WriteString("%22%2C")
 		}
 	}
 
@@ -417,12 +417,12 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 		if id != len(jobs)-1 {
 			differentPod.WriteString(".*%7C")
 		} else {
-			//differentPod.WriteString(".*%22%2C%20%20")
-			differentPod.WriteString(".*%22%2C")
+			differentPod.WriteString(".*%22%2C%20%20")
+			//differentPod.WriteString(".*%22%2C")
 		}
 	}
 
-	/*
+	
 	return "http://" + ip + ":" + port +
 		"/api/v1/query_range?query=sum%20by%20(pod%2C%20namespace)%20(label_replace(rate(container_cpu_cfs_throttled_seconds_total%7Bnamespace%3D~%22" +
 		differentNamespaces.String() +
@@ -432,7 +432,7 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 		"&start=" + strconv.Itoa(int(start)) +
 		"&end=" + strconv.Itoa(int(end)) +
 		"&step=1"
-		*/
+	/*
 	return "http://" + ip + ":" + port +
 		"/api/v1/query_range?query=sum%28container_cpu_cfs_throttled_periods_total%7Bnamespace%3D%7E%22" + differentNamespaces.String() +
 		"+pod%3D%7E%22" + differentPod.String() +
@@ -442,6 +442,7 @@ func generateCPUThrottleURL(ip string, port string, jobs []Job, start int64, end
 		"&start=" + strconv.Itoa(int(start)) +
 		"&end=" + strconv.Itoa(int(end)) +
 		"&step=1"
+		*/
 }
 
 // sum by (pod, namespace) (label_replace(rate(container_cpu_cfs_throttled_seconds_total{}[1m]), "pod", "$1", "pod", "(.*)-.{5}"))

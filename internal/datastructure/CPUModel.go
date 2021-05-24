@@ -248,13 +248,15 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 		maxThreshold := t.avgThrottling + t.avgThrottling*0.2
 		minThreshold := t.avgThrottling - t.avgThrottling*0.2
 
-		if found && t.linearPrediction > maxThreshold && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
+		//log.Print("Pod " + job.Name + " (avg, threshold) (" + strconv.Itoa(int(t.avgThrottling)) + ", " + strconv.Itoa(int(cp.cpuThrottlingLowerThreshold)) + ")")
+
+		if found && t.linearPrediction > maxThreshold && /*t.avgThrottling > cp.cpuThrottlingLowerThreshold &&*/ cp.jobs[key].cpuPrediction != nil {
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 			cp.jobs[key].cpuPrediction[id] += cp.jobs[key].cpuPrediction[id] * computeResourceIncrease(t.linearPrediction, maxThreshold)
 			log.Print("Increasing CPU for pod " + cp.jobs[key].jobInformation.Name + " of " + fmt.Sprintf("%f", computeResourceIncrease(t.linearPrediction, minThreshold)))
 		}
 
-		if found && t.linearPrediction < minThreshold && t.avgThrottling > cp.cpuThrottlingLowerThreshold && cp.jobs[key].cpuPrediction != nil {
+		if found && t.linearPrediction < minThreshold && /*t.avgThrottling > cp.cpuThrottlingLowerThreshold &&*/ cp.jobs[key].cpuPrediction != nil {
 			id := generateTimeslotIndex(currTime, cp.timeslots)
 			cp.jobs[key].cpuPrediction[id] -= cp.jobs[key].cpuPrediction[id] * computeResourceDecrease(t.linearPrediction, minThreshold)
 			log.Print("Reducing CPU for pod " + cp.jobs[key].jobInformation.Name + " of " + fmt.Sprintf("%f", computeResourceDecrease(t.linearPrediction, minThreshold)))
