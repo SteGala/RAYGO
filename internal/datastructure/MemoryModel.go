@@ -61,7 +61,7 @@ func (mm *MemoryModel) InsertJob(jobName string, namespace string, records []sys
 	peak := computeKPercentile(records, 100, mm.timeslots)
 	monitoring.ExposeMemoryProfiling(jobName, namespace, "exponential", peak[generateTimeslotIndex(time.Now(), mm.timeslots)])
 
-	if countNonZeroRecords(records) >= 1500 {
+	if countNonZeroRecords(records) >= 500 {
 		job.memoryPrediction = peak
 	} else {
 		job.memoryPrediction = nil

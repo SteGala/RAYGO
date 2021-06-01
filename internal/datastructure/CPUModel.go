@@ -65,7 +65,7 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 	percentile := computeKPercentile(records, 97, cp.timeslots)
 	monitoring.ExposeCPUProfiling(jobName, namespace, "exponential", percentile[generateTimeslotIndex(time.Now(), cp.timeslots)])
 
-	if countNonZeroRecords(records) >= 1500 {
+	if countNonZeroRecords(records) >= 500 {
 		job.cpuPrediction = percentile
 	} else {
 		job.cpuPrediction = nil
@@ -135,7 +135,7 @@ func (cp *CPUModel) GetLastUpdatedJob() (system.Job, error) {
 }
 
 func computeCPUCorrectionConstant(i int, timeslots int) float64 {
-	decayTime := 850 / timeslots
+	decayTime := 900 / timeslots
 
 	return math.Exp2(float64(-i) / float64(decayTime))
 }
