@@ -361,8 +361,8 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			s += s * 0.15
 
 			//set some lower bounds
-			if s < 0.03 {
-				s = 0.03
+			if s < 0.05 {
+				s = 0.05
 			}
 
 			podRequest["cpu"] = resource.MustParse(fmt.Sprintf("%f", s))
