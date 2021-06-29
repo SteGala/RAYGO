@@ -163,9 +163,9 @@ func (rp *ResourceProfiling) UpdatePrediction(jobs []system.Job, c chan Resource
 		rp.updateResourceModel(job.Name, job.Namespace, profilingTime)
 	}
 
-	if err := rp.tuneResourceModel(jobs); err != nil {
-		log.Print(err)
-	}
+	//if err := rp.tuneResourceModel(jobs); err != nil {
+	//	log.Print(err)
+	//}
 
 	for _, job := range jobs {
 		rpv := ResourceProfilingValue{}

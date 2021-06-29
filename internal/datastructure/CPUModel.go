@@ -65,6 +65,7 @@ func (cp *CPUModel) InsertJob(jobName string, namespace string, records []system
 	percentile := computeKPercentile(records, 97, cp.timeslots)
 	monitoring.ExposeCPUProfiling(jobName, namespace, "exponential", percentile[generateTimeslotIndex(time.Now(), cp.timeslots)])
 
+	//log.Printf("Received %d CPU records", countNonZeroRecords(records))
 	if countNonZeroRecords(records) >= 500 {
 		job.cpuPrediction = percentile
 	} else {

@@ -163,7 +163,7 @@ func computeResourceDecrease(value float64, avg float64) float64 {
 
 	x := avg / value
 
-	decrease := 0.05 * math.Exp(x/3.0)
+	decrease := 0.01 * math.Exp(x/2.0)
 
 	if decrease > 0.2 {
 		decrease = 0.2
