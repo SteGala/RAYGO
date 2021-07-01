@@ -215,7 +215,7 @@ func (cp *CPUModel) UpdateJob(records []system.ResourceRecord) {
 				podName:          job.Name,
 				podNamespace:     job.Namespace,
 				avgThrottling:    avg,
-				linearPrediction: b*(count+1.0) + a,
+				linearPrediction: b*(count+15.0) + a,
 			})
 
 			sum = 0.0

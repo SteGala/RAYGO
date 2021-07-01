@@ -210,11 +210,11 @@ func (mm *MemoryModel) UpdateJob(records []system.ResourceRecord) {
 			l := len(split) - 1*/
 
 			memFailInfo = append(memFailInfo, result{
-				/*				podName:          strings.Join(split[:l], "-"),
-				 */podName:       job.Name,
+				//podName:          strings.Join(split[:l], "-"),
+				podName:       job.Name,
 				podNamespace:     job.Namespace,
 				avgFail:          avg,
-				linearPrediction: b*(count+1.0) + a,
+				linearPrediction: b*(count+15.0) + a,
 			})
 
 			sum = 0.0

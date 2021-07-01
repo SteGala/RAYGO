@@ -351,7 +351,7 @@ func (p *ProfilingSystem) updateDeploymentSpec(job system.Job, memoryLabel Resou
 			podLimit["memory"] = resource.MustParse(fmt.Sprintf("%.0f", 1.7*s) + "Mi")
 		}
 	} else {
-		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort requests/limits update")
+		return errors.New("Not enough data available for pod " + extractDeploymentFromPodName(job.Name) + ". Abort requests/limits update.")
 	}
 
 	// add label for cpu
